@@ -1,0 +1,1215 @@
+{
+  "cell_size": 32,
+  "columns": 16,
+  "rows": 12,
+  "sheet_width": 512,
+  "sheet_height": 384,
+  "texture_filter": "Nearest,Nearest",
+  "backgrounds": {
+    "transparent": "demir_avaz_ui_buttons_transparent.png",
+    "magenta_key": "demir_avaz_ui_buttons_magenta_key.png",
+    "key_color": "#FF00FF"
+  },
+  "regions": {
+    "play_normal": {
+      "x": 0,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "pause_normal": {
+      "x": 32,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "stop_normal": {
+      "x": 64,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "close_normal": {
+      "x": 96,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "gear_normal": {
+      "x": 128,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "bag_normal": {
+      "x": 160,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "sword_normal": {
+      "x": 192,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "shield_normal": {
+      "x": 224,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "map_normal": {
+      "x": 256,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "chest_normal": {
+      "x": 288,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "lock_normal": {
+      "x": 320,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "sound_normal": {
+      "x": 352,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "plus_normal": {
+      "x": 384,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "minus_normal": {
+      "x": 416,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "left_normal": {
+      "x": 448,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "right_normal": {
+      "x": 480,
+      "y": 0,
+      "w": 32,
+      "h": 32
+    },
+    "play_hover": {
+      "x": 0,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "pause_hover": {
+      "x": 32,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "stop_hover": {
+      "x": 64,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "close_hover": {
+      "x": 96,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "gear_hover": {
+      "x": 128,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "bag_hover": {
+      "x": 160,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "sword_hover": {
+      "x": 192,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "shield_hover": {
+      "x": 224,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "map_hover": {
+      "x": 256,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "chest_hover": {
+      "x": 288,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "lock_hover": {
+      "x": 320,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "sound_hover": {
+      "x": 352,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "plus_hover": {
+      "x": 384,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "minus_hover": {
+      "x": 416,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "left_hover": {
+      "x": 448,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "right_hover": {
+      "x": 480,
+      "y": 32,
+      "w": 32,
+      "h": 32
+    },
+    "play_pressed": {
+      "x": 0,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "pause_pressed": {
+      "x": 32,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "stop_pressed": {
+      "x": 64,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "close_pressed": {
+      "x": 96,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "gear_pressed": {
+      "x": 128,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "bag_pressed": {
+      "x": 160,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "sword_pressed": {
+      "x": 192,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "shield_pressed": {
+      "x": 224,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "map_pressed": {
+      "x": 256,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "chest_pressed": {
+      "x": 288,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "lock_pressed": {
+      "x": 320,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "sound_pressed": {
+      "x": 352,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "plus_pressed": {
+      "x": 384,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "minus_pressed": {
+      "x": 416,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "left_pressed": {
+      "x": 448,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "right_pressed": {
+      "x": 480,
+      "y": 64,
+      "w": 32,
+      "h": 32
+    },
+    "play_disabled": {
+      "x": 0,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "pause_disabled": {
+      "x": 32,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "stop_disabled": {
+      "x": 64,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "close_disabled": {
+      "x": 96,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "gear_disabled": {
+      "x": 128,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "bag_disabled": {
+      "x": 160,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "sword_disabled": {
+      "x": 192,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "shield_disabled": {
+      "x": 224,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "map_disabled": {
+      "x": 256,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "chest_disabled": {
+      "x": 288,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "lock_disabled": {
+      "x": 320,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "sound_disabled": {
+      "x": 352,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "plus_disabled": {
+      "x": 384,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "minus_disabled": {
+      "x": 416,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "left_disabled": {
+      "x": 448,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "right_disabled": {
+      "x": 480,
+      "y": 96,
+      "w": 32,
+      "h": 32
+    },
+    "up_normal": {
+      "x": 0,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "down_normal": {
+      "x": 32,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "check_normal": {
+      "x": 64,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "xmark_normal": {
+      "x": 96,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "menu_normal": {
+      "x": 128,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "home_normal": {
+      "x": 160,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "book_normal": {
+      "x": 192,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "potion_normal": {
+      "x": 224,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "coin_normal": {
+      "x": 256,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "hammer_normal": {
+      "x": 288,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "helmet_normal": {
+      "x": 320,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "flag_normal": {
+      "x": 352,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "star_normal": {
+      "x": 384,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "heart_normal": {
+      "x": 416,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "skull_normal": {
+      "x": 448,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "question_normal": {
+      "x": 480,
+      "y": 128,
+      "w": 32,
+      "h": 32
+    },
+    "up_hover": {
+      "x": 0,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "down_hover": {
+      "x": 32,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "check_hover": {
+      "x": 64,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "xmark_hover": {
+      "x": 96,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "menu_hover": {
+      "x": 128,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "home_hover": {
+      "x": 160,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "book_hover": {
+      "x": 192,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "potion_hover": {
+      "x": 224,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "coin_hover": {
+      "x": 256,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "hammer_hover": {
+      "x": 288,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "helmet_hover": {
+      "x": 320,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "flag_hover": {
+      "x": 352,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "star_hover": {
+      "x": 384,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "heart_hover": {
+      "x": 416,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "skull_hover": {
+      "x": 448,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "question_hover": {
+      "x": 480,
+      "y": 160,
+      "w": 32,
+      "h": 32
+    },
+    "up_pressed": {
+      "x": 0,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "down_pressed": {
+      "x": 32,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "check_pressed": {
+      "x": 64,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "xmark_pressed": {
+      "x": 96,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "menu_pressed": {
+      "x": 128,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "home_pressed": {
+      "x": 160,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "book_pressed": {
+      "x": 192,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "potion_pressed": {
+      "x": 224,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "coin_pressed": {
+      "x": 256,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "hammer_pressed": {
+      "x": 288,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "helmet_pressed": {
+      "x": 320,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "flag_pressed": {
+      "x": 352,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "star_pressed": {
+      "x": 384,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "heart_pressed": {
+      "x": 416,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "skull_pressed": {
+      "x": 448,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "question_pressed": {
+      "x": 480,
+      "y": 192,
+      "w": 32,
+      "h": 32
+    },
+    "up_disabled": {
+      "x": 0,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "down_disabled": {
+      "x": 32,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "check_disabled": {
+      "x": 64,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "xmark_disabled": {
+      "x": 96,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "menu_disabled": {
+      "x": 128,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "home_disabled": {
+      "x": 160,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "book_disabled": {
+      "x": 192,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "potion_disabled": {
+      "x": 224,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "coin_disabled": {
+      "x": 256,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "hammer_disabled": {
+      "x": 288,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "helmet_disabled": {
+      "x": 320,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "flag_disabled": {
+      "x": 352,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "star_disabled": {
+      "x": 384,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "heart_disabled": {
+      "x": 416,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "skull_disabled": {
+      "x": 448,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "question_disabled": {
+      "x": 480,
+      "y": 224,
+      "w": 32,
+      "h": 32
+    },
+    "wide_normal_left": {
+      "x": 0,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_normal_mid": {
+      "x": 32,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_normal_right": {
+      "x": 64,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_button_normal_96x32": {
+      "x": 0,
+      "y": 256,
+      "w": 96,
+      "h": 32
+    },
+    "wide_hover_left": {
+      "x": 96,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_hover_mid": {
+      "x": 128,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_hover_right": {
+      "x": 160,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_button_hover_96x32": {
+      "x": 96,
+      "y": 256,
+      "w": 96,
+      "h": 32
+    },
+    "wide_pressed_left": {
+      "x": 192,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_pressed_mid": {
+      "x": 224,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_pressed_right": {
+      "x": 256,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_button_pressed_96x32": {
+      "x": 192,
+      "y": 256,
+      "w": 96,
+      "h": 32
+    },
+    "wide_disabled_left": {
+      "x": 288,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_disabled_mid": {
+      "x": 320,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_disabled_right": {
+      "x": 352,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "wide_button_disabled_96x32": {
+      "x": 288,
+      "y": 256,
+      "w": 96,
+      "h": 32
+    },
+    "empty_square_normal": {
+      "x": 384,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "empty_square_hover": {
+      "x": 416,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "empty_square_pressed": {
+      "x": 448,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "empty_square_disabled": {
+      "x": 480,
+      "y": 256,
+      "w": 32,
+      "h": 32
+    },
+    "tab_normal_left": {
+      "x": 0,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_normal_mid": {
+      "x": 32,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_normal_right": {
+      "x": 64,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_normal_96x32": {
+      "x": 0,
+      "y": 288,
+      "w": 96,
+      "h": 32
+    },
+    "tab_hover_left": {
+      "x": 96,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_hover_mid": {
+      "x": 128,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_hover_right": {
+      "x": 160,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_hover_96x32": {
+      "x": 96,
+      "y": 288,
+      "w": 96,
+      "h": 32
+    },
+    "tab_active_left": {
+      "x": 192,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_active_mid": {
+      "x": 224,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_active_right": {
+      "x": 256,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_active_96x32": {
+      "x": 192,
+      "y": 288,
+      "w": 96,
+      "h": 32
+    },
+    "tab_disabled_left": {
+      "x": 288,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_disabled_mid": {
+      "x": 320,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_disabled_right": {
+      "x": 352,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "tab_disabled_96x32": {
+      "x": 288,
+      "y": 288,
+      "w": 96,
+      "h": 32
+    },
+    "toggle_off_normal": {
+      "x": 384,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "toggle_on_normal": {
+      "x": 416,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "toggle_on_hover": {
+      "x": 448,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "toggle_off_disabled": {
+      "x": 480,
+      "y": 288,
+      "w": 32,
+      "h": 32
+    },
+    "slider_left": {
+      "x": 0,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_mid": {
+      "x": 32,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_right": {
+      "x": 64,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "fill_left": {
+      "x": 96,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "fill_mid": {
+      "x": 128,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "fill_right": {
+      "x": 160,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_knob_normal": {
+      "x": 192,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_knob_hover": {
+      "x": 224,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_knob_pressed": {
+      "x": 256,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "slider_knob_disabled": {
+      "x": 288,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "checkbox_off_normal": {
+      "x": 320,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "checkbox_on_normal": {
+      "x": 352,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "checkbox_on_hover": {
+      "x": 384,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "checkbox_off_disabled": {
+      "x": 416,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "radio_off_normal": {
+      "x": 448,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "radio_on_normal": {
+      "x": 480,
+      "y": 320,
+      "w": 32,
+      "h": 32
+    },
+    "frame_tl": {
+      "x": 0,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_t": {
+      "x": 32,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_tr": {
+      "x": 64,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_l": {
+      "x": 96,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_c": {
+      "x": 128,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_r": {
+      "x": 160,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_bl": {
+      "x": 192,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_b": {
+      "x": 224,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "frame_br": {
+      "x": 256,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "rivet_round": {
+      "x": 288,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "rivet_diamond": {
+      "x": 320,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "divider_h": {
+      "x": 352,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "divider_v": {
+      "x": 384,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "scroll_up": {
+      "x": 416,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "scroll_down": {
+      "x": 448,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    },
+    "blank_32": {
+      "x": 480,
+      "y": 352,
+      "w": 32,
+      "h": 32
+    }
+  }
+}
