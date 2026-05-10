@@ -11,7 +11,7 @@ public class Main extends CrimsonSky {
     public void create() {
         super.create();
         ScreenManager.getInstance().initialize(this);
-        ScreenManager.getInstance().showScreen(ScreenType.LOGIN);
+        ScreenManager.getInstance().showScreen(ScreenType.MAIN_MENU);
     }
 
     @Override

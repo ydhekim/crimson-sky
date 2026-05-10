@@ -6,6 +6,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.kotcrab.vis.ui.widget.VisLabel;
+import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 
 public class MainMenuScreen extends BaseScreen {
@@ -16,12 +17,12 @@ public class MainMenuScreen extends BaseScreen {
     }
 
     private void setupUI() {
-        Table rootTable = new Table();
-        rootTable.setFillParent(true);
-        stage.addActor(rootTable);
+        VisTable mainPanel = createMainContentPanel();
 
         VisLabel titleLabel = new VisLabel("MAIN MENU");
         titleLabel.setFontScale(2f);
+
+        Table buttonTable = new Table();
 
         TextButton charactersButton = new TextButton("Characters", customButtonStyle);
         charactersButton.addListener(new ClickListener() {
@@ -55,10 +56,12 @@ public class MainMenuScreen extends BaseScreen {
             }
         });
 
-        rootTable.add(titleLabel).padBottom(40).row();
-        rootTable.add(charactersButton).width(96).height(32).padBottom(10).row();
-        rootTable.add(achievementsButton).width(96).height(32).padBottom(10).row();
-        rootTable.add(settingsButton).width(96).height(32).padBottom(10).row();
-        rootTable.add(exitButton).width(96).height(32).padBottom(10).row();
+        buttonTable.add(charactersButton).width(200).height(40).padBottom(15).row();
+        buttonTable.add(achievementsButton).width(200).height(40).padBottom(15).row();
+        buttonTable.add(settingsButton).width(200).height(40).padBottom(15).row();
+        buttonTable.add(exitButton).width(200).height(40).padBottom(15).row();
+
+        mainPanel.add(titleLabel).padBottom(60).row();
+        mainPanel.add(buttonTable);
     }
 }

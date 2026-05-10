@@ -1,6 +1,6 @@
 package io.github.ydhekim.crimson_sky.screen;
 
 public enum ScreenType {
-    LOGIN,
+    MAIN_MENU,
     GAME
 }

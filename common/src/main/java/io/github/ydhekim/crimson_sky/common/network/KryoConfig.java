@@ -43,10 +43,6 @@ public class KryoConfig {
         kryo.register(Object[].class);
 
         // Register Packets
-        kryo.register(LoginRequest.class);
-        kryo.register(LoginResponse.class);
-        kryo.register(SignUpRequest.class);
-        kryo.register(SignUpResponse.class);
         kryo.register(CharacterListRequest.class);
         kryo.register(CharacterListResponse.class);
         kryo.register(CreateCharacterRequest.class);

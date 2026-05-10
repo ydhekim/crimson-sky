@@ -5,7 +5,6 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
@@ -16,12 +15,11 @@ import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.kotcrab.vis.ui.widget.VisDialog;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisScrollPane;
+import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListResponse;
-import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterRequest;
-import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterResponse;
 import io.github.ydhekim.crimson_sky.common.network.packet.DeleteCharacterRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.DeleteCharacterResponse;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
@@ -31,46 +29,53 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     private Table charactersListContainer;
     private VisScrollPane scrollPane;
     private Array<Character> characters;
-    private int maxCharacterSlots = 3; // Default, will be updated by server
+    private int maxCharacterSlots = 3;
 
     private TextButton createCharacterButton;
     private Texture placeholderAvatarTexture;
-    private Texture rowBackgroundTexture; // Cached row background to prevent memory leaks
+    private Texture rowBackgroundTexture;
 
     public CharactersScreen(final CrimsonSky game) {
         super(game);
         characters = new Array<>();
 
-        // Create a simple gray placeholder texture for character silhouettes
         Pixmap pixmap = new Pixmap(64, 64, Pixmap.Format.RGBA8888);
         pixmap.setColor(Color.DARK_GRAY);
         pixmap.fill();
         placeholderAvatarTexture = new Texture(pixmap);
         pixmap.dispose();
 
-        // Create the row background to reuse for all rows
         Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        bgPixmap.setColor(new Color(0.1f, 0.1f, 0.1f, 0.8f));
+        bgPixmap.setColor(new Color(0.2f, 0.2f, 0.2f, 0.8f));
         bgPixmap.fill();
         rowBackgroundTexture = new Texture(bgPixmap);
         bgPixmap.dispose();
 
         setupUI();
         game.getNetworkClient().setListener(this);
-
-        // Fetch the characters for the user
         fetchCharacters();
     }
 
     private void setupUI() {
-        Table rootTable = new Table();
-        rootTable.setFillParent(true);
-        stage.addActor(rootTable);
+        VisTable mainPanel = createMainContentPanel();
 
         // --- Header ---
         VisLabel titleLabel = new VisLabel("Character Selection");
         titleLabel.setFontScale(2f);
-        rootTable.add(titleLabel).padTop(20).padBottom(20).row();
+        mainPanel.add(titleLabel).padBottom(20).row();
+
+        // --- Top Action Bar ---
+        createCharacterButton = new TextButton("New Character", customButtonStyle);
+        createCharacterButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (!createCharacterButton.isDisabled()) {
+                    game.setScreen(new CharacterCreationScreen(game));
+                }
+            }
+        });
+
+        mainPanel.add(createCharacterButton).width(150).height(40).padBottom(20).row();
 
         // --- Character List Container ---
         charactersListContainer = new Table();
@@ -80,20 +85,10 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         scrollPane.setOverscroll(false, false);
         scrollPane.setFadeScrollBars(false);
         scrollPane.setScrollingDisabled(true, false);
-        rootTable.add(scrollPane).expand().fill().padLeft(20).padRight(20).row();
+        mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
 
         // --- Footer ---
-        createCharacterButton = new TextButton("New Character", customButtonStyle);
-        createCharacterButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                if (!createCharacterButton.isDisabled()) {
-                    // Mocking Character Creation Process
-                    mockCharacterCreation();
-                }
-            }
-        });
-
+        VisTable footerTable = new VisTable();
         TextButton backButton = new TextButton("Back", customButtonStyle);
         backButton.addListener(new ClickListener() {
             @Override
@@ -102,12 +97,10 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
             }
         });
 
-        Table footerTable = new Table();
-        // Vertical layout for the two buttons
-        footerTable.add(createCharacterButton).width(96).height(32).padBottom(10).row();
-        footerTable.add(backButton).width(96).height(32);
+        footerTable.add(backButton).width(96).height(32).left();
+        footerTable.add().expandX();
 
-        rootTable.add(footerTable).padTop(20).padBottom(20);
+        mainPanel.add(footerTable).expandX().fillX().bottom();
 
         updateList(characters);
     }
@@ -140,15 +133,14 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
     private Table createCharacterRow(final Character character) {
         Table row = new Table();
-        // Give row a subtle background so it looks like a distinct panel
         row.setBackground(new TextureRegionDrawable(new TextureRegion(rowBackgroundTexture)));
         row.pad(10);
 
-        // Slot 1: Visual (Silhouette)
+        // Slot 1: Visual
         Image avatar = new Image(placeholderAvatarTexture);
         row.add(avatar).size(64, 64).padRight(20);
 
-        // Slot 2: Info (Name, Level, Exp)
+        // Slot 2: Info
         Table infoTable = new Table();
         infoTable.left();
         VisLabel nameLabel = new VisLabel(character.name());
@@ -162,7 +154,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         row.add(infoTable).expandX().fillX();
 
-        // Slot 3: Actions (Play, Delete)
+        // Slot 3: Actions
         Table actionsTable = new Table();
         TextButton playButton = new TextButton("Play", customButtonStyle);
         playButton.addListener(new ClickListener() {
@@ -186,15 +178,6 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         row.add(actionsTable).right().padLeft(20);
 
         return row;
-    }
-
-    private void mockCharacterCreation() {
-        // Generates a mock name like "Hero_42"
-        String mockName = "Hero_" + MathUtils.random(1000, 9999);
-
-        // Disable button temporarily to prevent spamming
-        createCharacterButton.setDisabled(true);
-        game.getNetworkClient().sendTCP(new CreateCharacterRequest(mockName));
     }
 
     private void confirmDeleteCharacter(final Character character) {
@@ -232,7 +215,6 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     }
 
     private void startGame(Character character) {
-        // TODO: Send packet to enter the world with this character, and transition to GameScreen
         System.out.println("Starting game with " + character.name() + "...");
     }
 
@@ -242,20 +224,6 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
             if (response.success) {
                 this.maxCharacterSlots = response.maxCharacterSlots;
                 updateList(response.characters != null ? response.characters : new Array<>());
-            } else {
-                // Could show an error dialog here
-            }
-        });
-    }
-
-    @Override
-    public void onCreateCharacterResponse(CreateCharacterResponse response) {
-        Gdx.app.postRunnable(() -> {
-            if (response.success) {
-                fetchCharacters(); // Refresh the list
-            } else {
-                createCharacterButton.setDisabled(false);
-                // Could show an error dialog here
             }
         });
     }
@@ -264,9 +232,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     public void onDeleteCharacterResponse(DeleteCharacterResponse response) {
         Gdx.app.postRunnable(() -> {
             if (response.success) {
-                fetchCharacters(); // Refresh the list
-            } else {
-                // Could show an error dialog here
+                fetchCharacters();
             }
         });
     }
@@ -280,8 +246,6 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         if (rowBackgroundTexture != null) {
             rowBackgroundTexture.dispose();
         }
-
-        // Clear the listener to avoid memory leaks
         game.getNetworkClient().setListener(null);
     }
 }

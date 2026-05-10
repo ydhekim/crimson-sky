@@ -2,16 +2,20 @@ package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
-import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 import com.kotcrab.vis.ui.VisUI;
+import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 
 public abstract class BaseScreen extends ScreenAdapter {
@@ -21,12 +25,22 @@ public abstract class BaseScreen extends ScreenAdapter {
     protected Image backgroundImage;
     protected TextButton.TextButtonStyle customButtonStyle;
 
+    // Core responsive layout constants
+    protected static final float VIRTUAL_WIDTH = 1280f;
+    protected static final float VIRTUAL_HEIGHT = 720f;
+    protected static final float MAIN_PANEL_WIDTH = 960f;
+    protected static final float MAIN_PANEL_HEIGHT = 600f;
+
+    protected Texture panelBackgroundTexture;
+
     public BaseScreen(CrimsonSky game) {
         this.game = game;
-        viewport = new ScreenViewport();
+        // Using FitViewport to ensure responsive, aspect-ratio-locked scaling across platforms
+        viewport = new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         stage = new Stage(viewport);
         setupBackground();
         setupButtonStyle();
+        createPanelBackground();
     }
 
     private void setupBackground() {
@@ -38,11 +52,36 @@ public abstract class BaseScreen extends ScreenAdapter {
         }
     }
 
+    private void createPanelBackground() {
+        Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        bgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.85f)); // Dark semi-transparent background
+        bgPixmap.fill();
+        panelBackgroundTexture = new Texture(bgPixmap);
+        bgPixmap.dispose();
+    }
+
     private void setupButtonStyle() {
         if (VisUI.isLoaded()) {
-            // Retrieve the custom button style defined in uiskin.json
             customButtonStyle = VisUI.getSkin().get("custom", TextButton.TextButtonStyle.class);
         }
+    }
+
+    /**
+     * Creates a standardized, centered main panel table for screens to use.
+     * Ensures consistent UX sizing across the application.
+     */
+    protected VisTable createMainContentPanel() {
+        VisTable container = new VisTable();
+        container.setFillParent(true);
+
+        VisTable mainPanel = new VisTable();
+        mainPanel.setBackground(new TextureRegionDrawable(new TextureRegion(panelBackgroundTexture)));
+        mainPanel.pad(20);
+
+        container.add(mainPanel).width(MAIN_PANEL_WIDTH).height(MAIN_PANEL_HEIGHT);
+        stage.addActor(container);
+
+        return mainPanel;
     }
 
     @Override
@@ -73,6 +112,9 @@ public abstract class BaseScreen extends ScreenAdapter {
     public void dispose() {
         if (stage != null) {
             stage.dispose();
+        }
+        if (panelBackgroundTexture != null) {
+            panelBackgroundTexture.dispose();
         }
     }
 }

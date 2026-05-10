@@ -15,6 +15,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.kotcrab.vis.ui.VisUI;
 import io.github.ydhekim.crimson_sky.network.GameClient;
 import io.github.ydhekim.crimson_sky.network.KryoClient;
+import io.github.ydhekim.crimson_sky.screen.MainMenuScreen;
 
 public class CrimsonSky extends Game {
     private GameClient networkClient;
@@ -59,6 +60,9 @@ public class CrimsonSky extends Game {
         networkClient = new KryoClient();
         // Assuming default local test server config
         networkClient.connect("127.0.0.1", 54555, 54777);
+
+        // Start the game directly at the Main Menu
+        setScreen(new MainMenuScreen(this));
     }
 
     public GameClient getNetworkClient() {

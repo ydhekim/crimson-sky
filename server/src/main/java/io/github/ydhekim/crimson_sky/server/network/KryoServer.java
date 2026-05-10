@@ -21,8 +21,6 @@ public class KryoServer implements GameServer {
 
     public KryoServer(UserDao userDao, CharacterDao characterDao) {
         // Registering handlers
-        handlers.put(LoginRequest.class, new LoginRequestHandler(userDao));
-        handlers.put(SignUpRequest.class, new SignUpRequestHandler(userDao));
         handlers.put(CharacterListRequest.class, new CharacterListRequestHandler(characterDao));
         handlers.put(CreateCharacterRequest.class, new CreateCharacterRequestHandler(characterDao));
         handlers.put(DeleteCharacterRequest.class, new DeleteCharacterRequestHandler(characterDao));

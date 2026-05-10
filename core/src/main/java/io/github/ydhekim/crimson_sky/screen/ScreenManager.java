@@ -41,7 +41,7 @@ public class ScreenManager {
 
     private Screen createScreen(ScreenType type) {
         return switch (type) {
-            case LOGIN -> new LoginScreen((CrimsonSky) game);
+            case MAIN_MENU -> new MainMenuScreen((CrimsonSky) game);
             case GAME ->
                 // Return new GameScreen() once implemented
                     throw new UnsupportedOperationException("GameScreen not yet implemented.");
