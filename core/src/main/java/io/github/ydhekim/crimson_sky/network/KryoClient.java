@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class KryoClient implements GameClient {
-    private Client client;
+    private final Client client;
     private NetworkListener listener;
 
     // Using a Map for OCP (Open-Closed Principle) just like the server
@@ -60,6 +60,9 @@ public class KryoClient implements GameClient {
     private void setupHandlers() {
         // Registering responses to methods on the active listener
         // The cast (Object -> SpecificPacket) is safe because of the Map key class
+        packetHandlers.put(LoginResponse.class,
+            packet -> listener.onLoginResponse((LoginResponse) packet));
+
         packetHandlers.put(CharacterListResponse.class,
             packet -> listener.onCharacterListResponse((CharacterListResponse) packet));
 

@@ -12,6 +12,11 @@ import com.badlogic.gdx.utils.ObjectMap;
 import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.*;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
+import io.github.ydhekim.crimson_sky.common.model.Character;
+import io.github.ydhekim.crimson_sky.common.model.Faction;
+import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Loadout;
+import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterRequest;
 
 public class CharacterCreationScreen extends BaseScreen {
@@ -28,7 +33,7 @@ public class CharacterCreationScreen extends BaseScreen {
     private final ObjectMap<String, VisLabel> statValueLabels = new ObjectMap<>();
 
     private int statPool = INITIAL_STAT_POOL;
-    private String selectedFaction = "Faction A";
+    private Faction selectedFaction = Faction.A;
 
     public CharacterCreationScreen(CrimsonSky game) {
         super(game);
@@ -64,7 +69,6 @@ public class CharacterCreationScreen extends BaseScreen {
         // --- Middle Section ---
         VisTable middleTable = new VisTable();
 
-        // Faction Selection and Stats Table laid out vertically as requested
         middleTable.add(createFactionSelectionTable()).expandX().fillX().padBottom(20).row();
         middleTable.add(createStatsTable()).expand().fill();
 
@@ -86,7 +90,7 @@ public class CharacterCreationScreen extends BaseScreen {
         factionAButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                selectedFaction = "Faction A";
+                selectedFaction = Faction.A;
                 factionDescriptionLabel.setText("Description for Faction A. This faction focuses on might and raw power.");
             }
         });
@@ -94,7 +98,7 @@ public class CharacterCreationScreen extends BaseScreen {
         factionBButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                selectedFaction = "Faction B";
+                selectedFaction = Faction.B;
                 factionDescriptionLabel.setText("Description for Faction B. This faction is known for its cunning and arcane knowledge.");
             }
         });
@@ -198,15 +202,38 @@ public class CharacterCreationScreen extends BaseScreen {
                     return;
                 }
 
-                System.out.println("--- Persisting Character ---");
-                System.out.println("Name: " + characterName);
-                System.out.println("Faction: " + selectedFaction);
-                for (ObjectMap.Entry<String, Integer> entry : stats) {
-                    System.out.println(entry.key + ": " + entry.value);
-                }
-                System.out.println("--------------------------");
+                // Construct the Stats object from the UI
+                Stats characterStats = new Stats(
+                    stats.get("Strength"),
+                    stats.get("Dexterity"),
+                    stats.get("Vitality"),
+                    stats.get("Intelligence"),
+                    stats.get("Wisdom"),
+                    stats.get("Spirit"),
+                    stats.get("Speed"),
+                    stats.get("Insight")
+                );
 
-                game.getNetworkClient().sendTCP(new CreateCharacterRequest(characterName));
+                Character newCharacter = new Character(
+                        0,
+                        0,
+                        characterName,
+                        selectedFaction,
+                        1,
+                        0,
+                        100,
+                        100,
+                        10,
+                        10,
+                        characterStats,
+                        new Inventory(null, null, null),
+                        new Loadout(null, null, null)
+                );
+
+                // Send the complete request to the server
+                game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter));
+
+                // Switch back to the character list screen to await the response
                 game.setScreen(new CharactersScreen(game));
             }
         });

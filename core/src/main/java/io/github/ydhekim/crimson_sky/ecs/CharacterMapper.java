@@ -38,18 +38,18 @@ public class CharacterMapper {
         entity.add(levelCmp);
 
         HealthComponent healthCmp = engine.createComponent(HealthComponent.class);
-        healthCmp.maxHealth = character.maxHealth();
-        healthCmp.currentHealth = character.maxHealth(); // start at max
+        healthCmp.maxHealth = character.maxHp();
+        healthCmp.currentHealth = character.maxHp(); // start at max
         entity.add(healthCmp);
 
         ManaComponent manaCmp = engine.createComponent(ManaComponent.class);
-        manaCmp.maxMana = character.maxMana();
-        manaCmp.currentMana = character.maxMana(); // start at max
+        manaCmp.maxMana = character.maxMp();
+        manaCmp.currentMana = character.maxMp(); // start at max
         entity.add(manaCmp);
 
         BaseStatsComponent baseStatsCmp = engine.createComponent(BaseStatsComponent.class);
-        baseStatsCmp.baseDefence = character.baseDefence();
-        baseStatsCmp.baseAttackPower = character.baseAttackPower();
+        baseStatsCmp.baseDefence = character.baseDef();
+        baseStatsCmp.baseAttackPower = character.baseAtk();
         entity.add(baseStatsCmp);
 
         StatsComponent statsCmp = engine.createComponent(StatsComponent.class);
@@ -57,9 +57,7 @@ public class CharacterMapper {
         entity.add(statsCmp);
 
         InventoryComponent invCmp = engine.createComponent(InventoryComponent.class);
-        invCmp.weapons.addAll(character.weapons());
-        invCmp.skills.addAll(character.skills());
-        invCmp.pets.addAll(character.pets());
+        invCmp.inventory = character.inventory();
         entity.add(invCmp);
 
         LoadoutComponent loadoutCmp = engine.createComponent(LoadoutComponent.class);

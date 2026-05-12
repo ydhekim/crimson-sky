@@ -1,11 +1,13 @@
 package io.github.ydhekim.crimson_sky.common.network.packet;
 
+import io.github.ydhekim.crimson_sky.common.model.Character;
+
 public class CreateCharacterRequest {
-    public String name;
+    public Character character;
 
     public CreateCharacterRequest() {}
 
-    public CreateCharacterRequest(String name) {
-        this.name = name;
+    public CreateCharacterRequest(Character character) {
+        this.character = character;
     }
 }

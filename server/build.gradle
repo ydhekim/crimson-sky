@@ -13,6 +13,19 @@ dependencies {
   api "org.postgresql:postgresql:$postgresDriverVersion"
   api "at.favre.lib:bcrypt:$bcryptVersion"
   api "com.badlogicgames.gdx:gdx:$gdxVersion"
+
+  // JDBI 3 Database persistence
+  api "org.jdbi:jdbi3-core:$jdbiVersion"
+  api "org.jdbi:jdbi3-sqlobject:$jdbiVersion"
+  api "org.jdbi:jdbi3-postgres:$jdbiVersion"
+  api "org.jdbi:jdbi3-jackson2:$jdbiVersion"
+
+  // Jackson for JSONB mapping
+  api "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+  api "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:$jacksonVersion"
+
+  api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion" // JavaTimeModule
+  api "com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion" // ParameterNamesModule
 }
 
 jar {

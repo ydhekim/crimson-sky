@@ -11,15 +11,21 @@ import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGeneratorLoader;
 import com.badlogic.gdx.graphics.g2d.freetype.FreetypeFontLoader;
-import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.kotcrab.vis.ui.VisUI;
 import io.github.ydhekim.crimson_sky.network.GameClient;
 import io.github.ydhekim.crimson_sky.network.KryoClient;
-import io.github.ydhekim.crimson_sky.screen.MainMenuScreen;
+import io.github.ydhekim.crimson_sky.screen.ConnectionScreen;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 
 public class CrimsonSky extends Game {
     private GameClient networkClient;
     private AssetManager assetManager;
+
+    public CrimsonSky() {}
 
     @Override
     public void create() {
@@ -56,13 +62,42 @@ public class CrimsonSky extends Game {
             // Load custom styles from uiskin.json
             VisUI.getSkin().load(Gdx.files.internal("uiskin.json"));
         }
+
         // Applying Dependency Inversion
         networkClient = new KryoClient();
         // Assuming default local test server config
         networkClient.connect("127.0.0.1", 54555, 54777);
 
-        // Start the game directly at the Main Menu
-        setScreen(new MainMenuScreen(this));
+        // Read test token from local.properties
+        String testToken = readTestToken();
+
+        // Go to ConnectionScreen first
+        setScreen(new ConnectionScreen(this, testToken));
+    }
+
+    private String readTestToken() {
+        Properties properties = new Properties();
+
+        // When running via Gradle or IntelliJ, the working directory is usually lwjgl3/
+        // However, local.properties is in the root project directory.
+        // We try reading from the root directory first, then fallback to current directory.
+        File rootProps = new File("../local.properties");
+        File currentProps = new File("local.properties");
+
+        File targetFile = rootProps.exists() ? rootProps : (currentProps.exists() ? currentProps : null);
+
+        if (targetFile != null) {
+            try (FileInputStream fis = new FileInputStream(targetFile)) {
+                properties.load(fis);
+                return properties.getProperty("testIdentityToken");
+            } catch (IOException e) {
+                System.out.println("Error reading local.properties: " + e.getMessage());
+            }
+        } else {
+             System.out.println("No local.properties file found. Proceeding without a test token.");
+        }
+
+        return null;
     }
 
     public GameClient getNetworkClient() {

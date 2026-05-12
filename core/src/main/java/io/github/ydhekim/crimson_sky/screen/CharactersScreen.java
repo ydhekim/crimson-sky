@@ -18,10 +18,7 @@ import com.kotcrab.vis.ui.widget.VisScrollPane;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.common.model.Character;
-import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListRequest;
-import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListResponse;
-import io.github.ydhekim.crimson_sky.common.network.packet.DeleteCharacterRequest;
-import io.github.ydhekim.crimson_sky.common.network.packet.DeleteCharacterResponse;
+import io.github.ydhekim.crimson_sky.common.network.packet.*;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
 
 public class CharactersScreen extends BaseScreen implements NetworkListener {
@@ -59,12 +56,27 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     private void setupUI() {
         VisTable mainPanel = createMainContentPanel();
 
-        // --- Header ---
         VisLabel titleLabel = new VisLabel("Character Selection");
         titleLabel.setFontScale(2f);
         mainPanel.add(titleLabel).padBottom(20).row();
 
-        // --- Top Action Bar ---
+        charactersListContainer = new Table();
+        charactersListContainer.top();
+
+        scrollPane = new VisScrollPane(charactersListContainer);
+        scrollPane.setOverscroll(false, false);
+        scrollPane.setFadeScrollBars(false);
+        scrollPane.setScrollingDisabled(true, false);
+        mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
+
+        VisTable footerTable = new VisTable();
+        TextButton backButton = new TextButton("Back", customButtonStyle);
+        backButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
         createCharacterButton = new TextButton("New Character", customButtonStyle);
         createCharacterButton.addListener(new ClickListener() {
             @Override
@@ -75,32 +87,11 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
             }
         });
 
-        mainPanel.add(createCharacterButton).width(150).height(40).padBottom(20).row();
-
-        // --- Character List Container ---
-        charactersListContainer = new Table();
-        charactersListContainer.top();
-
-        scrollPane = new VisScrollPane(charactersListContainer);
-        scrollPane.setOverscroll(false, false);
-        scrollPane.setFadeScrollBars(false);
-        scrollPane.setScrollingDisabled(true, false);
-        mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
-
-        // --- Footer ---
-        VisTable footerTable = new VisTable();
-        TextButton backButton = new TextButton("Back", customButtonStyle);
-        backButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new MainMenuScreen(game));
-            }
-        });
-
-        footerTable.add(backButton).width(96).height(32).left();
+        footerTable.add(backButton).width(200).height(40).left();
         footerTable.add().expandX();
+        footerTable.add(createCharacterButton).width(200).height(40).right();
 
-        mainPanel.add(footerTable).expandX().fillX().bottom();
+        mainPanel.add(footerTable).expandX().fillX();
 
         updateList(characters);
     }
@@ -124,10 +115,10 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         boolean canCreate = characters.size < maxCharacterSlots;
         createCharacterButton.setDisabled(!canCreate);
-        if(!canCreate) {
-             createCharacterButton.setText("Slots Full");
+        if (!canCreate) {
+            createCharacterButton.setText("Slots Full");
         } else {
-             createCharacterButton.setText("New Character");
+            createCharacterButton.setText("New Character");
         }
     }
 
@@ -193,19 +184,19 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         TextButton yesButton = new TextButton("Yes", customButtonStyle);
         yesButton.addListener(new ClickListener() {
-             @Override
-             public void clicked(InputEvent event, float x, float y) {
-                  dialog.hide();
-                  game.getNetworkClient().sendTCP(new DeleteCharacterRequest(character.name()));
-             }
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                dialog.hide();
+                game.getNetworkClient().sendTCP(new DeleteCharacterRequest(character.name()));
+            }
         });
 
         TextButton noButton = new TextButton("No", customButtonStyle);
         noButton.addListener(new ClickListener() {
-             @Override
-             public void clicked(InputEvent event, float x, float y) {
-                  dialog.hide();
-             }
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                dialog.hide();
+            }
         });
 
         dialog.getButtonsTable().add(yesButton).width(96).height(32).pad(10);
@@ -223,7 +214,23 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         Gdx.app.postRunnable(() -> {
             if (response.success) {
                 this.maxCharacterSlots = response.maxCharacterSlots;
-                updateList(response.characters != null ? response.characters : new Array<>());
+                Array<Character> gdxArray = new Array<>(response.characters != null ? response.characters.size() : 0);
+                if (response.characters != null) {
+                    for (Character c : response.characters) {
+                        gdxArray.add(c);
+                    }
+                }
+                updateList(response.characters != null ? gdxArray : new Array<>());
+            }
+        });
+    }
+
+    @Override
+    public void onCreateCharacterResponse(CreateCharacterResponse response) {
+        Gdx.app.postRunnable(() -> {
+            if (response.success && response.character != null) {
+                characters.add(response.character);
+                updateList(characters);
             }
         });
     }

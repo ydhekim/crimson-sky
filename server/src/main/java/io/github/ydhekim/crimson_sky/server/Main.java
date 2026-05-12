@@ -1,34 +1,29 @@
 package io.github.ydhekim.crimson_sky.server;
 
 import io.github.ydhekim.crimson_sky.server.database.DatabaseManager;
-import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
-import io.github.ydhekim.crimson_sky.server.database.dao.UserDao;
 import io.github.ydhekim.crimson_sky.server.network.GameServer;
+import io.github.ydhekim.crimson_sky.server.network.KryoPacketRouter;
 import io.github.ydhekim.crimson_sky.server.network.KryoServer;
+import io.github.ydhekim.crimson_sky.server.network.PacketRouter;
+import io.github.ydhekim.crimson_sky.server.service.ServiceRegistry;
 
 public class Main {
     private static final int TCP_PORT = 54555;
     private static final int UDP_PORT = 54777;
 
     public static void main(String[] args) {
-        System.out.println("Starting Crimson Sky Server...");
-
         DatabaseManager dbManager = DatabaseManager.getInstance();
-        System.out.println("Database pool configured.");
+        ServiceRegistry serviceRegistry = new ServiceRegistry(dbManager);
+        PacketRouter packetRouter = new KryoPacketRouter(
+            serviceRegistry.getUserService(),
+            serviceRegistry.getCharacterService()
+        );
 
-        // Dependency Injection Setup
-        UserDao userDao = new UserDao();
-        CharacterDao characterDao = new CharacterDao();
-
-        // Start Network Server
         try {
-            // Inject dependencies into the server
-            GameServer server = new KryoServer(userDao, characterDao);
+            GameServer server = new KryoServer(packetRouter);
             server.start(TCP_PORT, UDP_PORT);
 
-            // Keep the server running
             Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                System.out.println("Shutting down server...");
                 server.stop();
                 dbManager.close();
             }));

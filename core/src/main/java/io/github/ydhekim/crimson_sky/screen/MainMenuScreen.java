@@ -21,6 +21,7 @@ public class MainMenuScreen extends BaseScreen {
 
         VisLabel titleLabel = new VisLabel("MAIN MENU");
         titleLabel.setFontScale(2f);
+        mainPanel.add(titleLabel).padBottom(20).row();
 
         Table buttonTable = new Table();
 
@@ -61,7 +62,6 @@ public class MainMenuScreen extends BaseScreen {
         buttonTable.add(settingsButton).width(200).height(40).padBottom(15).row();
         buttonTable.add(exitButton).width(200).height(40).padBottom(15).row();
 
-        mainPanel.add(titleLabel).padBottom(60).row();
         mainPanel.add(buttonTable);
     }
 }

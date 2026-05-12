@@ -1,26 +1,25 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
-import com.badlogic.gdx.utils.Array;
-import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.CharacterListResponse;
-import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.network.GameConnection;
 import io.github.ydhekim.crimson_sky.server.network.RequestHandler;
+import io.github.ydhekim.crimson_sky.server.service.CharacterService;
 
 public class CharacterListRequestHandler implements RequestHandler<CharacterListRequest> {
 
-    private final CharacterDao characterDao;
+    private final CharacterService characterService;
 
-    public CharacterListRequestHandler(CharacterDao characterDao) {
-        this.characterDao = characterDao;
+    public CharacterListRequestHandler(CharacterService characterService) {
+        this.characterService = characterService;
     }
 
     @Override
     public void handle(GameConnection connection, CharacterListRequest request) {
-        if (connection.user == null) return;
+        if (connection.account == null) return;
 
-        Array<Character> characters = characterDao.getCharactersByUserId(connection.user.getId());
-        connection.sendTCP(new CharacterListResponse(true, "Characters loaded", characters, 3));
+        var result = characterService.getCharacters(connection.account.id());
+
+        connection.sendTCP(new CharacterListResponse(result.success(), result.code().name(), result.data(), connection.account.maxSlots()));
     }
 }

@@ -1,59 +1,42 @@
 package io.github.ydhekim.crimson_sky.server.database.dao;
 
-import io.github.ydhekim.crimson_sky.server.database.DatabaseManager;
+import io.github.ydhekim.crimson_sky.common.model.PlatformType;
+import io.github.ydhekim.crimson_sky.server.database.entity.Account;
+import io.github.ydhekim.crimson_sky.server.database.entity.AccountSettings;
 import io.github.ydhekim.crimson_sky.server.database.entity.User;
-import at.favre.lib.crypto.bcrypt.BCrypt;
+import org.jdbi.v3.json.Json;
+import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
+import org.jdbi.v3.sqlobject.customizer.Bind;
+import org.jdbi.v3.sqlobject.statement.GetGeneratedKeys;
+import org.jdbi.v3.sqlobject.statement.SqlQuery;
+import org.jdbi.v3.sqlobject.statement.SqlUpdate;
+import org.jdbi.v3.sqlobject.transaction.Transaction;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.time.OffsetDateTime;
+import java.util.Optional;
 
-public class UserDao {
+@RegisterConstructorMapper(User.class)
+@RegisterConstructorMapper(Account.class)
+public interface UserDao {
 
-    public User getUserByUsername(String username) {
-        String sql = "SELECT id, username, password_hash, created_at FROM users WHERE username = ?";
-        try (Connection conn = DatabaseManager.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, username);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return new User(
-                            rs.getInt("id"),
-                            rs.getString("username"),
-                            rs.getString("password_hash"),
-                            rs.getObject("created_at", OffsetDateTime.class)
-                    );
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return null;
-    }
+    @SqlQuery("SELECT * FROM users WHERE platform_type = :platformType AND identity_token = :token")
+    Optional<User> findUserByToken(@Bind("platformType") String platformType, @Bind("token") String token);
 
-    public boolean verifyPassword(String username, String rawPassword) {
-        User user = getUserByUsername(username);
-        if (user == null) return false;
+    @SqlUpdate("INSERT INTO users (platform_type, identity_token) VALUES (:platformType, :token)")
+    @GetGeneratedKeys("id")
+    long insertUser(@Bind("platformType") String platformType, @Bind("token") String token);
 
-        BCrypt.Result result = BCrypt.verifyer().verify(rawPassword.toCharArray(), user.getPasswordHash());
-        return result.verified;
-    }
+    @SqlUpdate("INSERT INTO accounts (user_id, max_slots, global_currency, settings) VALUES (:userId, 3, 0, :s)")
+    @GetGeneratedKeys("id")
+    long insertAccount(@Bind("userId") long userId, @Json @Bind("s") AccountSettings defaultSettings);
 
-    public boolean createUser(String username, String rawPassword) {
-        String sql = "INSERT INTO users (username, password_hash) VALUES (?, ?)";
-        String passwordHash = BCrypt.withDefaults().hashToString(12, rawPassword.toCharArray());
+    @SqlQuery("SELECT * FROM accounts WHERE user_id = :userId")
+    Optional<Account> findAccountByUserId(@Bind("userId") long userId);
 
-        try (Connection conn = DatabaseManager.getInstance().getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, username);
-            stmt.setString(2, passwordHash);
-            int rowsAffected = stmt.executeUpdate();
-            return rowsAffected > 0;
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return false;
-        }
+    @Transaction
+    default Account createUserAndAccount(PlatformType platformType, String token) {
+        long userId = insertUser(platformType.name(), token);
+        AccountSettings defaultSettings = new AccountSettings(0.5, "en_US", true);
+        long accountId = insertAccount(userId, defaultSettings);
+        return findAccountByUserId(userId).orElseThrow(() -> new IllegalStateException("Failed to retrieve created account"));
     }
 }
