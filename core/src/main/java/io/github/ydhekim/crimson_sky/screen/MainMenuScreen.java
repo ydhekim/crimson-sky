@@ -37,7 +37,7 @@ public class MainMenuScreen extends BaseScreen {
         achievementsButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                // TODO: Navigate to Achievements Screen
+                game.setScreen(new AchievementsScreen(game)); // Navigate to Achievements Screen
             }
         });
 
