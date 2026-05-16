@@ -215,19 +215,19 @@ public class CharacterCreationScreen extends BaseScreen {
                 );
 
                 Character newCharacter = new Character(
-                        0,
-                        0,
-                        characterName,
-                        selectedFaction,
-                        1,
-                        0,
-                        100,
-                        100,
-                        10,
-                        10,
-                        characterStats,
-                        new Inventory(null, null, null),
-                        new Loadout(null, null, null)
+                    0,
+                    0,
+                    characterName,
+                    selectedFaction,
+                    1,
+                    0,
+                    100,
+                    100,
+                    10,
+                    10,
+                    characterStats,
+                    new Inventory(null, null, null),
+                    new Loadout(null, null, null)
                 );
 
                 // Send the complete request to the server

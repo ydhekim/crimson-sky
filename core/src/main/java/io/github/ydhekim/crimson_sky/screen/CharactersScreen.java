@@ -70,7 +70,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
 
         VisTable footerTable = new VisTable();
-        TextButton backButton = new TextButton("Back", customButtonStyle);
+        TextButton backButton = new TextButton(game.getLanguageManager().get("UI_BTN_BACK"), customButtonStyle);
         backButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -242,6 +242,31 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
                 fetchCharacters();
             }
         });
+    }
+
+    @Override
+    public void onLocalizationResponse(LocalizationResponse response) {
+        Gdx.app.log("CharactersScreen", "Response alındı! Başarı: " + response.success);
+
+        if (response.success && response.translations != null) {
+            Gdx.app.log("CharactersScreen", "Gelen veri boyutu: " + response.translations.size());
+
+            // Gelen verileri tek tek logla (Hangi anahtarlar gelmiş görelim)
+            response.translations.forEach((key, value) ->
+                Gdx.app.log("CharactersScreen", "Key: " + key + " | Value: " + value));
+
+            Gdx.app.postRunnable(() -> {
+                // 1. Veriyi menajere işle
+                game.getLanguageManager().setTranslations(response.translations);
+
+                // 2. KRİTİK NOKTA: Ekranı taze dille baştan yarat
+                // setupUI() sadece metni değiştirmez, yeni objeler oluşturur.
+                // O yüzden en temizi ekranı setScreen ile yenilemektir.
+                game.setScreen(new CharactersScreen(game));
+            });
+        } else {
+            Gdx.app.error("CharactersScreen", "Veri boş veya başarısız!");
+        }
     }
 
     @Override

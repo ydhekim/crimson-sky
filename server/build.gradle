@@ -26,6 +26,12 @@ dependencies {
 
   api "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:$jacksonVersion" // JavaTimeModule
   api "com.fasterxml.jackson.module:jackson-module-parameter-names:$jacksonVersion" // ParameterNamesModule
+
+  // Flyway Çekirdek Bağımlılığı
+  implementation "org.flywaydb:flyway-core:12.6.0"
+
+  // PostgreSQL için Flyway Veritabanı Desteği (Flyway 10+ için şart)
+  implementation "org.flywaydb:flyway-database-postgresql:12.6.0"
 }
 
 jar {

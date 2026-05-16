@@ -20,9 +20,9 @@ public interface CharacterDao {
     boolean isNameTaken(@Bind("name") String name);
 
     @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, base_def, base_atk, stats, inventory, loadout) " +
-        "VALUES (:accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout)")
+        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout)")
     @GetGeneratedKeys("id")
-    long createCharacter(@Bind("accountId") long accountId, @BindMethods("c") CharacterEntity characterEntity);
+    long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);

@@ -9,7 +9,6 @@ import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
-import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.FitViewport;
@@ -17,15 +16,16 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
+import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationResponse;
+import io.github.ydhekim.crimson_sky.network.NetworkListener;
 
-public abstract class BaseScreen extends ScreenAdapter {
+public abstract class BaseScreen extends ScreenAdapter implements NetworkListener {
     protected final CrimsonSky game;
     protected Stage stage;
     protected Viewport viewport;
     protected Image backgroundImage;
     protected TextButton.TextButtonStyle customButtonStyle;
 
-    // Core responsive layout constants
     protected static final float VIRTUAL_WIDTH = 1280f;
     protected static final float VIRTUAL_HEIGHT = 720f;
     protected static final float MAIN_PANEL_WIDTH = 960f;
@@ -35,7 +35,6 @@ public abstract class BaseScreen extends ScreenAdapter {
 
     public BaseScreen(CrimsonSky game) {
         this.game = game;
-        // Using FitViewport to ensure responsive, aspect-ratio-locked scaling across platforms
         viewport = new FitViewport(VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
         stage = new Stage(viewport);
         setupBackground();
@@ -54,7 +53,7 @@ public abstract class BaseScreen extends ScreenAdapter {
 
     private void createPanelBackground() {
         Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        bgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.85f)); // Dark semi-transparent background
+        bgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.85f));
         bgPixmap.fill();
         panelBackgroundTexture = new Texture(bgPixmap);
         bgPixmap.dispose();
@@ -66,10 +65,6 @@ public abstract class BaseScreen extends ScreenAdapter {
         }
     }
 
-    /**
-     * Creates a standardized, centered main panel table for screens to use.
-     * Ensures consistent UX sizing across the application.
-     */
     protected VisTable createMainContentPanel() {
         VisTable container = new VisTable();
         container.setFillParent(true);
@@ -84,9 +79,18 @@ public abstract class BaseScreen extends ScreenAdapter {
         return mainPanel;
     }
 
+    /**
+     * This method should be overridden by screens that need to rebuild their UI
+     * after a significant data change, like receiving localization.
+     */
+    public void refreshUI() {
+        // By default, does nothing.
+    }
+
     @Override
     public void show() {
         Gdx.input.setInputProcessor(stage);
+        game.getNetworkClient().setListener(this);
     }
 
     @Override
@@ -106,6 +110,14 @@ public abstract class BaseScreen extends ScreenAdapter {
     @Override
     public void hide() {
         Gdx.input.setInputProcessor(null);
+        game.getNetworkClient().setListener(null);
+    }
+
+    @Override
+    public void onLocalizationResponse(LocalizationResponse response) {
+        if (response.success) {
+            Gdx.app.postRunnable(this::refreshUI);
+        }
     }
 
     @Override

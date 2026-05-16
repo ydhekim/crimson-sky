@@ -12,9 +12,11 @@ import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGeneratorLoader;
 import com.badlogic.gdx.graphics.g2d.freetype.FreetypeFontLoader;
 import com.kotcrab.vis.ui.VisUI;
+import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationRequest;
 import io.github.ydhekim.crimson_sky.network.GameClient;
 import io.github.ydhekim.crimson_sky.network.KryoClient;
 import io.github.ydhekim.crimson_sky.screen.ConnectionScreen;
+import io.github.ydhekim.crimson_sky.util.LanguageManager;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -24,6 +26,7 @@ import java.util.Properties;
 public class CrimsonSky extends Game {
     private GameClient networkClient;
     private AssetManager assetManager;
+    private LanguageManager languageManager;
 
     public CrimsonSky() {}
 
@@ -63,16 +66,19 @@ public class CrimsonSky extends Game {
             VisUI.getSkin().load(Gdx.files.internal("uiskin.json"));
         }
 
+        languageManager = new LanguageManager();
+        languageManager.setCurrentLang("tr_TR");
+
         // Applying Dependency Inversion
         networkClient = new KryoClient();
-        // Assuming default local test server config
-        networkClient.connect("127.0.0.1", 54555, 54777);
+        networkClient.setLanguageManager(languageManager);
 
         // Read test token from local.properties
         String testToken = readTestToken();
 
-        // Go to ConnectionScreen first
-        setScreen(new ConnectionScreen(this, testToken));
+        // Start connection sequence
+        ConnectionScreen connectionScreen = new ConnectionScreen(this, testToken);
+        setScreen(connectionScreen);
     }
 
     private String readTestToken() {
@@ -94,7 +100,7 @@ public class CrimsonSky extends Game {
                 System.out.println("Error reading local.properties: " + e.getMessage());
             }
         } else {
-             System.out.println("No local.properties file found. Proceeding without a test token.");
+            System.out.println("No local.properties file found. Proceeding without a test token.");
         }
 
         return null;
@@ -106,6 +112,10 @@ public class CrimsonSky extends Game {
 
     public AssetManager getAssetManager() {
         return assetManager;
+    }
+
+    public LanguageManager getLanguageManager() {
+        return languageManager;
     }
 
     @Override

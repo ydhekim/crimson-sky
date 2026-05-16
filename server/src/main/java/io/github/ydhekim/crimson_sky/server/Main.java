@@ -16,7 +16,8 @@ public class Main {
         ServiceRegistry serviceRegistry = new ServiceRegistry(dbManager);
         PacketRouter packetRouter = new KryoPacketRouter(
             serviceRegistry.getUserService(),
-            serviceRegistry.getCharacterService()
+            serviceRegistry.getCharacterService(),
+            serviceRegistry.getLocalizationService()
         );
 
         try {

@@ -12,6 +12,8 @@ import io.github.ydhekim.crimson_sky.common.network.packet.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Centralized Kryo registration logic to ensure Client and Server
@@ -21,8 +23,10 @@ public class KryoConfig {
     public static void register(Kryo kryo) {
         // Register Core Java Classes
         kryo.register(Object.class);
+        kryo.register(Map.class);
         kryo.register(HashMap.class);
         kryo.register(ArrayList.class);
+        kryo.register(LinkedHashMap.class);
 
         // Register LibGDX Collections
         kryo.register(Array.class, new Serializer<Array>() {
@@ -56,6 +60,8 @@ public class KryoConfig {
         kryo.register(CreateCharacterResponse.class);
         kryo.register(DeleteCharacterRequest.class);
         kryo.register(DeleteCharacterResponse.class);
+        kryo.register(LocalizationRequest.class);
+        kryo.register(LocalizationResponse.class);
 
         // Register Models (Records require RecordSerializer)
         kryo.register(Character.class, new RecordSerializer<>(Character.class));

@@ -7,6 +7,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import org.flywaydb.core.Flyway;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.core.mapper.reflect.ReflectionMappers;
 import org.jdbi.v3.core.mapper.reflect.SnakeCaseColumnNameMatcher;
@@ -20,6 +21,7 @@ import java.util.List;
 public class DatabaseManager {
     private static DatabaseManager instance;
     private HikariDataSource dataSource;
+    private Flyway flyway;
     private Jdbi jdbi;
 
     private DatabaseManager() {
@@ -48,6 +50,12 @@ public class DatabaseManager {
         config.setConnectionTimeout(10000);
 
         this.dataSource = new HikariDataSource(config);
+
+        this.flyway = Flyway.configure()
+            .dataSource(this.dataSource)
+            .locations("classpath:db/migration")
+            .load();
+        flyway.migrate();
 
         this.jdbi = Jdbi.create(dataSource)
             .installPlugin(new SqlObjectPlugin())

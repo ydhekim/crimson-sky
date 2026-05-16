@@ -33,7 +33,7 @@ public class CharacterService {
         }
 
         CharacterEntity newEntity = CharacterEntity.fromCommonModel(accountId, character);
-        long newId = characterDao.createCharacter(accountId, newEntity);
+        long newId = characterDao.createCharacter(newEntity);
 
         if (newId > 0) {
             return ServiceResult.success(MessageCode.CHAR_CREATE_SUCCESS, newId);
