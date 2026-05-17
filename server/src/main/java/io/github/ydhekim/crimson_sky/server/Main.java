@@ -5,13 +5,25 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.backends.headless.HeadlessApplication;
 import com.badlogic.gdx.backends.headless.HeadlessApplicationConfiguration;
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.server.bootstrap.ServerBootstrap;
 import io.github.ydhekim.crimson_sky.server.database.DatabaseManager;
-import io.github.ydhekim.crimson_sky.server.network.GameServer;
-import io.github.ydhekim.crimson_sky.server.network.KryoPacketRouter;
-import io.github.ydhekim.crimson_sky.server.network.KryoServer;
-import io.github.ydhekim.crimson_sky.server.network.PacketRouter;
-import io.github.ydhekim.crimson_sky.server.service.ServiceRegistry;
+import io.github.ydhekim.crimson_sky.server.network.factory.KryoNetworkServerFactory;
+import io.github.ydhekim.crimson_sky.server.network.factory.KryoPacketRouterFactory;
+import io.github.ydhekim.crimson_sky.server.network.factory.NetworkServerFactory;
+import io.github.ydhekim.crimson_sky.server.network.factory.PacketRouterFactory;
 
+/**
+ * Entry point for the Crimson Sky game server.
+ * Initializes the headless LibGDX environment and delegates server composition/lifecycle to ServerBootstrap.
+ *
+ * This class is intentionally small and focuses only on:
+ * 1. Initializing the headless LibGDX environment
+ * 2. Initializing the database manager
+ * 3. Creating factories for components
+ * 4. Delegating to ServerBootstrap for all composition and lifecycle management
+ *
+ * This design follows Single Responsibility Principle and Dependency Inversion Principle.
+ */
 public class Main {
     private static Logger log;
     private static final int TCP_PORT = 54555;
@@ -23,7 +35,6 @@ public class Main {
         new HeadlessApplication(new ApplicationAdapter() {
             @Override
             public void create() {
-                // Initialize logger after Gdx is set up
                 log = new Logger("Main", Logger.DEBUG);
                 Gdx.app.setLogLevel(com.badlogic.gdx.Application.LOG_DEBUG);
                 startServer();
@@ -34,35 +45,30 @@ public class Main {
     private static void startServer() {
         log.info("Starting Crimson Sky Server...");
 
-        DatabaseManager dbManager = null;
+        DatabaseManager dbManager;
         try {
             dbManager = DatabaseManager.getInstance();
             log.info("Database connection established.");
         } catch (Exception e) {
-             log.error("Critical failure during database initialization. Server cannot start.", e);
-             System.exit(1);
+            log.error("Critical failure during database initialization. Server cannot start.", e);
+            System.exit(1);
+            return;
         }
 
-        ServiceRegistry serviceRegistry = new ServiceRegistry(dbManager);
-        PacketRouter packetRouter = new KryoPacketRouter(
-            serviceRegistry.getUserService(),
-            serviceRegistry.getCharacterService(),
-            serviceRegistry.getLocalizationService(),
-            serviceRegistry.getAchievementService()
-        );
+        // Create factories (abstractions) instead of directly instantiating server components
+        PacketRouterFactory packetRouterFactory = new KryoPacketRouterFactory();
+        NetworkServerFactory networkFactory = new KryoNetworkServerFactory();
+
+        // Delegate composition and lifecycle to ServerBootstrap
+        ServerBootstrap bootstrap = new ServerBootstrap(
+                dbManager,
+                packetRouterFactory,
+                networkFactory,
+                TCP_PORT,
+                UDP_PORT);
 
         try {
-            GameServer server = new KryoServer(packetRouter);
-            server.start(TCP_PORT, UDP_PORT);
-
-            final DatabaseManager finalDbManager = dbManager;
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                log.info("Shutdown signal received. Stopping server...");
-                server.stop();
-                finalDbManager.close();
-                log.info("Server shutdown complete.");
-            }));
-
+            bootstrap.start();
         } catch (Exception e) {
             log.error("Server failed to start", e);
             System.exit(1);
