@@ -17,8 +17,8 @@ public class LocalizationRequestHandler implements RequestHandler<LocalizationRe
 
     @Override
     public void handle(GameConnection connection, LocalizationRequest request) {
-        log.info("Received localization request from Connection ID: " + connection.getID() + " for language code: " + request.langCode);
-        var result = localizationService.getLanguageBundle(request.langCode);
+        log.info("Received localization request from Connection ID: " + connection.getID() + " for language code: " + request.langCode());
+        var result = localizationService.getLanguageBundle(request.langCode());
 
         if (result.success()) {
             log.info("Successfully processed localization request for Connection ID: " + connection.getID());

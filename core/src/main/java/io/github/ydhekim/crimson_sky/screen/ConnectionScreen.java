@@ -114,18 +114,18 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
     public void onLocalizationResponse(io.github.ydhekim.crimson_sky.common.network.packet.LocalizationResponse response) {
         super.onLocalizationResponse(response);
 
-        if (response.success && testIdentityToken != null && !isAuthenticating) {
+        if (response.success() && testIdentityToken != null && !isAuthenticating) {
              Gdx.app.postRunnable(this::authenticateWithPlatform);
         }
     }
 
     @Override
     public void onLoginResponse(LoginResponse response) {
-        if (response.success) {
+        if (response.success()) {
             statusLabel.setText(game.getLanguageManager().get("UI_LOGIN_SUCCESS"));
             game.setScreen(new MainMenuScreen(game));
         } else {
-            statusLabel.setText(game.getLanguageManager().get("UI_LOGIN_FAILED") + ": " + response.message);
+            statusLabel.setText(game.getLanguageManager().get("UI_LOGIN_FAILED") + ": " + response.message());
             retryButton.setVisible(true);
             isAuthenticating = false;
         }

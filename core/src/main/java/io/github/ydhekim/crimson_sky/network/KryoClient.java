@@ -34,9 +34,9 @@ public class KryoClient implements GameClient {
                     Gdx.app.log("KryoClient", "Localization response intercepted.");
 
                     Gdx.app.postRunnable(() -> {
-                        if (response.success && languageManager != null) {
-                            languageManager.setTranslations(response.translations);
-                            Gdx.app.log("KryoClient", "LanguageManager updated. Keys: " + response.translations.size());
+                        if (response.success() && languageManager != null) {
+                            languageManager.setTranslations(response.translations());
+                            Gdx.app.log("KryoClient", "LanguageManager updated. Keys: " + response.translations().size());
                         }
 
                         if (listener != null) {

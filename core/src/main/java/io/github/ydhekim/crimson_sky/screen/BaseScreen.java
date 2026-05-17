@@ -115,7 +115,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
 
     @Override
     public void onLocalizationResponse(LocalizationResponse response) {
-        if (response.success) {
+        if (response.success()) {
             Gdx.app.postRunnable(this::refreshUI);
         }
     }

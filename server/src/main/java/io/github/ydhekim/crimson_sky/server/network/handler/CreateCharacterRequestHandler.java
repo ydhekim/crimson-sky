@@ -22,16 +22,16 @@ public class CreateCharacterRequestHandler implements RequestHandler<CreateChara
             return;
         }
 
-        log.info("Received create character request for name '" + request.character.name() + "' from Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
-        var result = characterService.createCharacter(connection.account.id(), request.character);
+        log.info("Received create character request for name '" + request.character().name() + "' from Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
+        var result = characterService.createCharacter(connection.account.id(), request.character());
 
         if (result.success()) {
-            log.info("Successfully created character '" + request.character.name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
+            log.info("Successfully created character '" + request.character().name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
         } else {
-            log.info("Failed to create character '" + request.character.name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id() + ". Reason: " + result.code().name());
+            log.info("Failed to create character '" + request.character().name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id() + ". Reason: " + result.code().name());
         }
 
-        connection.sendTCP(new CreateCharacterResponse(result.success(), result.code().name(), request.character));
+        connection.sendTCP(new CreateCharacterResponse(result.success(), result.code().name(), request.character()));
 
     }
 }

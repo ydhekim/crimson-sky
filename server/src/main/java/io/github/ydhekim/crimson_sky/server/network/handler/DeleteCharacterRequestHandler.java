@@ -22,15 +22,15 @@ public class DeleteCharacterRequestHandler implements RequestHandler<DeleteChara
             return;
         }
 
-        log.info("Received delete character request for name '" + request.name + "' from Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
-        var result = characterService.deleteCharacter(connection.account.id(), request.name);
+        log.info("Received delete character request for name '" + request.name() + "' from Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
+        var result = characterService.deleteCharacter(connection.account.id(), request.name());
 
         if (result.success()) {
-            log.info("Successfully deleted character '" + request.name + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
+            log.info("Successfully deleted character '" + request.name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
         } else {
-            log.info("Failed to delete character '" + request.name + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id() + ". Reason: " + result.code().name());
+            log.info("Failed to delete character '" + request.name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id() + ". Reason: " + result.code().name());
         }
 
-        connection.sendTCP(new DeleteCharacterResponse(result.success(), result.code().name(), request.name));
+        connection.sendTCP(new DeleteCharacterResponse(result.success(), result.code().name(), request.name()));
     }
 }

@@ -147,8 +147,8 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
     public void onAchievementListResponse(AchievementListResponse response) {
         // Ağ thread'inden LibGDX ana render thread'ine güvenli geçiş
         Gdx.app.postRunnable(() -> {
-            if (response.success && response.achievements != null) {
-                populateAchievements(response.achievements);
+            if (response.success() && response.achievements() != null) {
+                populateAchievements(response.achievements());
             } else {
                 scrollTable.clearChildren();
                 scrollTable.add(new VisLabel("Error loading achievements.")).expand().center();

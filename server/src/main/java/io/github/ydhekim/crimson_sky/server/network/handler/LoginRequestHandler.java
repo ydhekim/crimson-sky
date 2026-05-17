@@ -20,18 +20,18 @@ public class LoginRequestHandler implements RequestHandler<LoginRequest> {
 
     @Override
     public void handle(GameConnection connection, LoginRequest request) {
-        log.info("Received login request from Connection ID: " + connection.getID() + " for platform: " + request.platformType);
+        log.info("Received login request from Connection ID: " + connection.getID() + " for platform: " + request.platformType());
 
-        if (request.platformType == PlatformType.TEST) {
+        if (request.platformType() == PlatformType.TEST) {
             handleTestLogin(connection, request);
         } else {
-            log.info("Rejected login request from Connection ID: " + connection.getID() + ". Platform " + request.platformType + " not yet supported.");
-            connection.sendTCP(new LoginResponse(false, "Platform " + request.platformType + " not yet supported.", 0, 0));
+            log.info("Rejected login request from Connection ID: " + connection.getID() + ". Platform " + request.platformType() + " not yet supported.");
+            connection.sendTCP(new LoginResponse(false, "Platform " + request.platformType() + " not yet supported.", 0, 0));
         }
     }
 
     private void handleTestLogin(GameConnection connection, LoginRequest request) {
-        ServiceResult<Account> result = userService.loginTestUser(request.platformType, request.identityToken);
+        ServiceResult<Account> result = userService.loginTestUser(request.platformType(), request.identityToken());
 
         if (result.success()) {
             Account account = result.data();

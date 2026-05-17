@@ -212,15 +212,15 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     @Override
     public void onCharacterListResponse(CharacterListResponse response) {
         Gdx.app.postRunnable(() -> {
-            if (response.success) {
-                this.maxCharacterSlots = response.maxCharacterSlots;
-                Array<Character> gdxArray = new Array<>(response.characters != null ? response.characters.size() : 0);
-                if (response.characters != null) {
-                    for (Character c : response.characters) {
+            if (response.success()) {
+                this.maxCharacterSlots = response.maxCharacterSlots();
+                Array<Character> gdxArray = new Array<>(response.characters() != null ? response.characters().size() : 0);
+                if (response.characters() != null) {
+                    for (Character c : response.characters()) {
                         gdxArray.add(c);
                     }
                 }
-                updateList(response.characters != null ? gdxArray : new Array<>());
+                updateList(response.characters() != null ? gdxArray : new Array<>());
             }
         });
     }
@@ -228,8 +228,8 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     @Override
     public void onCreateCharacterResponse(CreateCharacterResponse response) {
         Gdx.app.postRunnable(() -> {
-            if (response.success && response.character != null) {
-                characters.add(response.character);
+            if (response.success() && response.character() != null) {
+                characters.add(response.character());
                 updateList(characters);
             }
         });
@@ -238,7 +238,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     @Override
     public void onDeleteCharacterResponse(DeleteCharacterResponse response) {
         Gdx.app.postRunnable(() -> {
-            if (response.success) {
+            if (response.success()) {
                 fetchCharacters();
             }
         });
@@ -246,18 +246,18 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
     @Override
     public void onLocalizationResponse(LocalizationResponse response) {
-        Gdx.app.log("CharactersScreen", "Response alındı! Başarı: " + response.success);
+        Gdx.app.log("CharactersScreen", "Response alındı! Başarı: " + response.success());
 
-        if (response.success && response.translations != null) {
-            Gdx.app.log("CharactersScreen", "Gelen veri boyutu: " + response.translations.size());
+        if (response.success() && response.translations() != null) {
+            Gdx.app.log("CharactersScreen", "Gelen veri boyutu: " + response.translations().size());
 
             // Gelen verileri tek tek logla (Hangi anahtarlar gelmiş görelim)
-            response.translations.forEach((key, value) ->
+            response.translations().forEach((key, value) ->
                 Gdx.app.log("CharactersScreen", "Key: " + key + " | Value: " + value));
 
             Gdx.app.postRunnable(() -> {
                 // 1. Veriyi menajere işle
-                game.getLanguageManager().setTranslations(response.translations);
+                game.getLanguageManager().setTranslations(response.translations());
 
                 // 2. KRİTİK NOKTA: Ekranı taze dille baştan yarat
                 // setupUI() sadece metni değiştirmez, yeni objeler oluşturur.

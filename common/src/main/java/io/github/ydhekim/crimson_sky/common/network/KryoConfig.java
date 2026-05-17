@@ -51,19 +51,19 @@ public class KryoConfig {
         });
         kryo.register(Object[].class);
 
-        // Register Packets
-        kryo.register(LoginRequest.class);
-        kryo.register(LoginResponse.class);
-        kryo.register(CharacterListRequest.class);
-        kryo.register(CharacterListResponse.class);
-        kryo.register(CreateCharacterRequest.class);
-        kryo.register(CreateCharacterResponse.class);
-        kryo.register(DeleteCharacterRequest.class);
-        kryo.register(DeleteCharacterResponse.class);
-        kryo.register(LocalizationRequest.class);
-        kryo.register(LocalizationResponse.class);
-        kryo.register(AchievementListRequest.class);
-        kryo.register(AchievementListResponse.class);
+        // Register Packets (Records require RecordSerializer)
+        kryo.register(LoginRequest.class, new RecordSerializer<>(LoginRequest.class));
+        kryo.register(LoginResponse.class, new RecordSerializer<>(LoginResponse.class));
+        kryo.register(CharacterListRequest.class, new RecordSerializer<>(CharacterListRequest.class));
+        kryo.register(CharacterListResponse.class, new RecordSerializer<>(CharacterListResponse.class));
+        kryo.register(CreateCharacterRequest.class, new RecordSerializer<>(CreateCharacterRequest.class));
+        kryo.register(CreateCharacterResponse.class, new RecordSerializer<>(CreateCharacterResponse.class));
+        kryo.register(DeleteCharacterRequest.class, new RecordSerializer<>(DeleteCharacterRequest.class));
+        kryo.register(DeleteCharacterResponse.class, new RecordSerializer<>(DeleteCharacterResponse.class));
+        kryo.register(LocalizationRequest.class, new RecordSerializer<>(LocalizationRequest.class));
+        kryo.register(LocalizationResponse.class, new RecordSerializer<>(LocalizationResponse.class));
+        kryo.register(AchievementListRequest.class, new RecordSerializer<>(AchievementListRequest.class));
+        kryo.register(AchievementListResponse.class, new RecordSerializer<>(AchievementListResponse.class));
 
         // Register Models (Records require RecordSerializer)
         kryo.register(Character.class, new RecordSerializer<>(Character.class));
@@ -82,7 +82,7 @@ public class KryoConfig {
         kryo.register(Inventory.class, new RecordSerializer<>(Inventory.class));
         kryo.register(Loadout.class, new RecordSerializer<>(Loadout.class));
 
-        kryo.register(AccountAchievement.class, new RecordSerializer(AccountAchievement.class));
+        kryo.register(AccountAchievement.class, new RecordSerializer<>(AccountAchievement.class));
 
         // Enums
         kryo.register(PlatformType.class);
