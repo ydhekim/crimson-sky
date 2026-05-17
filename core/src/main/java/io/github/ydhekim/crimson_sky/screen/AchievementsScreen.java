@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.screen;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
@@ -15,53 +16,67 @@ import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisScrollPane;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
+import io.github.ydhekim.crimson_sky.common.model.AccountAchievement;
+import io.github.ydhekim.crimson_sky.common.network.packet.AchievementListRequest;
+import io.github.ydhekim.crimson_sky.common.network.packet.AchievementListResponse;
+import io.github.ydhekim.crimson_sky.network.NetworkListener;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class AchievementsScreen extends BaseScreen {
+public class AchievementsScreen extends BaseScreen implements NetworkListener {
 
-    private List<Disposable> disposables;
+    private final List<Disposable> disposables;
+    private VisTable scrollTable;
+    private TextureRegionDrawable rowBgDrawable;
 
     public AchievementsScreen(CrimsonSky game) {
         super(game);
-        disposables = new ArrayList<>();
-        setupUI();
+        this.disposables = new ArrayList<>();
+
+        // 1. Ağ dinleyicisini bu ekrana ayarla ve istek at
+        game.getNetworkClient().setListener(this);
+
+        setupUIShell();
+        fetchAchievements();
     }
 
-    private void setupUI() {
+    private void fetchAchievements() {
+        game.getNetworkClient().sendTCP(new AchievementListRequest());
+    }
+
+    /**
+     * Ekranın ana iskeletini kurar (Başlık, ScrollPane kabuğu ve Geri butonu)
+     */
+    private void setupUIShell() {
         VisTable mainPanel = createMainContentPanel();
-        VisLabel headerLabel = new VisLabel("Achievements");
+
+        // Dil yönetiminden başlığı çekelim
+        VisLabel headerLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_ACHIEVEMENTS"));
         headerLabel.setFontScale(1.5f);
         mainPanel.add(headerLabel).pad(20).row();
-        VisTable scrollTable = new VisTable();
+
+        scrollTable = new VisTable();
         scrollTable.top();
+
+        // Satır arka plan dokusu
         Pixmap rowBgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
         rowBgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.7f));
         rowBgPixmap.fill();
         Texture rowBgTexture = new Texture(rowBgPixmap);
         rowBgPixmap.dispose();
         disposables.add(rowBgTexture);
-        TextureRegionDrawable rowBgDrawable = new TextureRegionDrawable(new TextureRegion(rowBgTexture));
+        rowBgDrawable = new TextureRegionDrawable(new TextureRegion(rowBgTexture));
 
-        for (int i = 1; i <= 20; i++) {
-            Texture icon = createPlaceholderTexture(getRandomColor());
-            disposables.add(icon);
-            scrollTable.add(createAchievementRow(icon, "Achievement " + i + ": Title", "Description for achievement number " + i + ". This text should wrap nicely within the allocated space.", rowBgDrawable))
-                .growX().padBottom(5).row();
-        }
-
-        // Create VisScrollPane
         VisScrollPane scrollPane = new VisScrollPane(scrollTable);
         scrollPane.setOverscroll(false, false);
         scrollPane.setFadeScrollBars(false);
         scrollPane.setScrollingDisabled(true, false);
-
         mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
 
+        // Footer & Back Button
         VisTable footerTable = new VisTable();
-        TextButton backButton = new TextButton("Back", customButtonStyle);
-
+        TextButton backButton = new TextButton(game.getLanguageManager().get("UI_BTN_BACK"), customButtonStyle);
         backButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -73,31 +88,72 @@ public class AchievementsScreen extends BaseScreen {
         mainPanel.add(footerTable).expandX().fillX();
     }
 
-    private VisTable createAchievementRow(Texture icon, String title, String description, TextureRegionDrawable background) {
+    /**
+     * Sunucudan veri geldiğinde listeyi dinamik olarak doldurur
+     */
+    private void populateAchievements(List<AccountAchievement> achievements) {
+        scrollTable.clearChildren(); // Eski veriler (varsa) temizlensin
+
+        if (achievements == null || achievements.isEmpty()) {
+            scrollTable.add(new VisLabel(game.getLanguageManager().get("UI_MSG_NO_ACHIEVEMENTS"))).expand().center();
+            return;
+        }
+
+        for (AccountAchievement ach : achievements) {
+            // AssetManager'dan iconId'ye göre texture çekilebilir, yoksa geçici renk üret
+            Texture icon = createPlaceholderTexture(getFactionColor(ach.keyName()));
+            disposables.add(icon);
+
+            // Dil anahtarlarını tercüme ettiriyoruz
+            String translatedTitle = game.getLanguageManager().get(ach.titleLocKey());
+            String translatedDesc = game.getLanguageManager().get(ach.descLocKey());
+
+            VisTable row = createAchievementRow(icon, translatedTitle, translatedDesc, rowBgDrawable, ach.isUnlocked());
+            scrollTable.add(row).growX().padBottom(5).row();
+        }
+    }
+
+    private VisTable createAchievementRow(Texture icon, String title, String description, TextureRegionDrawable background, boolean isUnlocked) {
         VisTable rowTable = new VisTable();
         rowTable.setBackground(background);
-        rowTable.pad(10); // Padding inside the row
-        // rowTable.debugAll(); // Uncomment to see layout debug lines
+        rowTable.pad(10);
 
-        // Icon
+        // Icon İşlemleri
         Image iconImage = new Image(icon);
+        if (!isUnlocked) {
+            // UX Dokunuşu: Eğer başarım kilitliyse simgeyi yarı şeffaf ve gri yapıyoruz!
+            iconImage.setColor(new Color(0.3f, 0.3f, 0.3f, 0.5f));
+        }
         rowTable.add(iconImage).size(64, 64).padRight(15).align(Align.left);
 
-        // Title and Description
+        // Metin Alanları
         VisTable textTable = new VisTable();
-        // textTable.debugAll(); // Uncomment to see layout debug lines
-        VisLabel titleLabel = new VisLabel(title); // Use default style
+        VisLabel titleLabel = new VisLabel(title);
+        if (!isUnlocked) titleLabel.setColor(Color.GRAY); // Kilitliyse başlık gri olsun
         titleLabel.setAlignment(Align.left);
         textTable.add(titleLabel).growX().row();
 
-        VisLabel descriptionLabel = new VisLabel(description); // Use default style
+        VisLabel descriptionLabel = new VisLabel(description);
         descriptionLabel.setWrap(true);
+        descriptionLabel.setColor(isUnlocked ? Color.LIGHT_GRAY : Color.DARK_GRAY);
         descriptionLabel.setAlignment(Align.topLeft);
         textTable.add(descriptionLabel).growX().row();
 
         rowTable.add(textTable).expandX().fillX().align(Align.top);
-
         return rowTable;
+    }
+
+    @Override
+    public void onAchievementListResponse(AchievementListResponse response) {
+        // Ağ thread'inden LibGDX ana render thread'ine güvenli geçiş
+        Gdx.app.postRunnable(() -> {
+            if (response.success && response.achievements != null) {
+                populateAchievements(response.achievements);
+            } else {
+                scrollTable.clearChildren();
+                scrollTable.add(new VisLabel("Error loading achievements.")).expand().center();
+            }
+        });
     }
 
     private Texture createPlaceholderTexture(Color color) {
@@ -109,20 +165,24 @@ public class AchievementsScreen extends BaseScreen {
         return texture;
     }
 
-    private Color getRandomColor() {
-        // Generate a random color for placeholder icons
-        return new Color((float) Math.random(), (float) Math.random(), (float) Math.random(), 1f);
+    private Color getFactionColor(String keyName) {
+        // Tamamen rastgele yerine başarımın adına göre sabit bir mock renk üretelim ki kırpışma yapmasın
+        int hash = keyName.hashCode();
+        float r = Math.abs((hash & 0xFF0000) >> 16) / 255f;
+        float g = Math.abs((hash & 0x00FF00) >> 8) / 255f;
+        float b = Math.abs(hash & 0x0000FF) / 255f;
+        return new Color(r, g, b, 1f);
     }
 
-    // BaseScreen already handles render, resize, hide, pause, resume.
-    // Only override dispose to clean up custom disposables.
     @Override
     public void dispose() {
-        super.dispose(); // Call BaseScreen's dispose method
-
+        super.dispose();
         for (Disposable disposable : disposables) {
-            disposable.dispose();
+            if (disposable != null) disposable.dispose();
         }
-        disposables.clear(); // Clear the list after disposing
+        disposables.clear();
+
+        // Dinleyiciyi temizleyerek hafıza sızıntısını (memory leak) engelliyoruz
+        game.getNetworkClient().setListener(null);
     }
 }

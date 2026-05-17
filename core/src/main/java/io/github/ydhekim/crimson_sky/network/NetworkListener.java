@@ -23,4 +23,7 @@ public interface NetworkListener {
 
     default void onLocalizationResponse(LocalizationResponse response) {
     }
+
+    default void onAchievementListResponse(AchievementListResponse response) {
+    }
 }

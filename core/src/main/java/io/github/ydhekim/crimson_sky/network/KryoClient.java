@@ -84,6 +84,8 @@ public class KryoClient implements GameClient {
             packet -> listener.onCreateCharacterResponse((CreateCharacterResponse) packet));
         packetHandlers.put(DeleteCharacterResponse.class,
             packet -> listener.onDeleteCharacterResponse((DeleteCharacterResponse) packet));
+        packetHandlers.put(AchievementListResponse.class,
+            packet -> listener.onAchievementListResponse((AchievementListResponse) packet));
     }
 
     @Override
