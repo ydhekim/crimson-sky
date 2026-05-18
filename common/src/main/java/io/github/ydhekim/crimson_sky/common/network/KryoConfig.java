@@ -64,6 +64,8 @@ public class KryoConfig {
         kryo.register(LocalizationResponse.class, new RecordSerializer<>(LocalizationResponse.class));
         kryo.register(AchievementListRequest.class, new RecordSerializer<>(AchievementListRequest.class));
         kryo.register(AchievementListResponse.class, new RecordSerializer<>(AchievementListResponse.class));
+        kryo.register(SaveAccountSettingsRequest.class, new RecordSerializer<>(SaveAccountSettingsRequest.class));
+        kryo.register(SaveAccountSettingsResponse.class, new RecordSerializer<>(SaveAccountSettingsResponse.class));
 
         // Register Models (Records require RecordSerializer)
         kryo.register(Character.class, new RecordSerializer<>(Character.class));
@@ -83,6 +85,7 @@ public class KryoConfig {
         kryo.register(Loadout.class, new RecordSerializer<>(Loadout.class));
 
         kryo.register(AccountAchievement.class, new RecordSerializer<>(AccountAchievement.class));
+        kryo.register(AccountSettings.class, new RecordSerializer<>(AccountSettings.class));
 
         // Enums
         kryo.register(PlatformType.class);

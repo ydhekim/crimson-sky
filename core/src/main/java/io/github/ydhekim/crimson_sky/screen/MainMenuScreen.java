@@ -2,7 +2,6 @@ package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
-import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
@@ -22,13 +21,18 @@ public class MainMenuScreen extends BaseScreen {
         super(game);
         // Get the ScreenRouter from the game instance
         this.screenRouter = game.getScreenRouter();
-        setupUI();
+//        setupUI();
     }
 
     /**
      * Sets up the main menu UI with navigation buttons using UIButtonBuilder.
      */
     private void setupUI() {
+        stage.clear();
+        if (backgroundImage != null) {
+            stage.addActor(backgroundImage);
+        }
+
         VisTable mainPanel = createMainContentPanel();
 
         VisLabel titleLabel = new VisLabel("MAIN MENU");
@@ -55,7 +59,7 @@ public class MainMenuScreen extends BaseScreen {
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_SETTINGS"))
             .withStyle(customButtonStyle)
             .withSize(200, 40)
-            .withAction(() -> Gdx.app.log("MainMenuScreen", "Settings not yet implemented."))
+            .withAction(this::navigateToSettings)
             .buildAndAddTo(buttonTable, 15);
         buttonTable.row();
 
@@ -84,9 +88,25 @@ public class MainMenuScreen extends BaseScreen {
         screenRouter.navigateTo(ScreenType.ACHIEVEMENTS);
     }
 
+    /**
+     * Navigates to the settings screen via ScreenRouter.
+     */
+    private void navigateToSettings() {
+        Gdx.app.log("MainMenuScreen", "Navigating to Settings screen.");
+        screenRouter.navigateTo(ScreenType.SETTINGS);
+    }
+
     @Override
     public void refreshUI() {
         Gdx.app.log("MainMenuScreen", "Refreshing UI with new localizations.");
+        stage.clear();
+        setupUI();
+    }
+
+    @Override
+    public void show() {
+        super.show();
+        stage.clear();
         setupUI();
     }
 }

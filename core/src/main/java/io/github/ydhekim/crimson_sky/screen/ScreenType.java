@@ -5,5 +5,6 @@ public enum ScreenType {
     CHARACTERS,
     CHARACTER_CREATION,
     ACHIEVEMENTS,
+    SETTINGS,
     GAME
 }

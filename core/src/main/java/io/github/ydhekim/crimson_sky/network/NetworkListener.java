@@ -26,4 +26,6 @@ public interface NetworkListener {
 
     default void onAchievementListResponse(AchievementListResponse response) {
     }
+
+    default void onSaveAccountSettingsResponse(SaveAccountSettingsResponse response) {}
 }

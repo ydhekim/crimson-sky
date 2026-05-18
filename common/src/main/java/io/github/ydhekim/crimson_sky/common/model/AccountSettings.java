@@ -1,4 +1,4 @@
-package io.github.ydhekim.crimson_sky.server.database.entity;
+package io.github.ydhekim.crimson_sky.common.model;
 
 public record AccountSettings(
     double volumeMaster,

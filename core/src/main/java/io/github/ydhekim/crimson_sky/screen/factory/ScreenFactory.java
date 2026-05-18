@@ -29,9 +29,9 @@ public class ScreenFactory {
             case CHARACTERS -> new CharactersScreen(game);
             case CHARACTER_CREATION -> new CharacterCreationScreen(game);
             case ACHIEVEMENTS -> new AchievementsScreen(game);
+            case SETTINGS -> new SettingsScreen(game);
             case GAME -> throw new UnsupportedOperationException("GameScreen not yet implemented.");
             default -> throw new IllegalArgumentException("Unknown screen type: " + type);
         };
     }
 }
-

@@ -2,7 +2,7 @@ package io.github.ydhekim.crimson_sky.server.database.dao;
 
 import io.github.ydhekim.crimson_sky.common.model.PlatformType;
 import io.github.ydhekim.crimson_sky.server.database.entity.Account;
-import io.github.ydhekim.crimson_sky.server.database.entity.AccountSettings;
+import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.server.database.entity.User;
 import org.jdbi.v3.json.Json;
 import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;

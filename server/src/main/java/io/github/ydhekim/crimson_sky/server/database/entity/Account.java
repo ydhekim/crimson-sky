@@ -9,7 +9,7 @@ public record Account(
     long userId,
     int maxSlots,
     long globalCurrency,
-    @Json AccountSettings settings,
+    @Json io.github.ydhekim.crimson_sky.common.model.AccountSettings settings,
     Instant createdAt
 ) {
 }

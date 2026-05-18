@@ -29,17 +29,19 @@ public class PacketHandlerRegistry {
      */
     private void registerDefaultHandlers() {
         register(LoginResponse.class,
-                packet -> listener.onLoginResponse((LoginResponse) packet));
+            packet -> listener.onLoginResponse((LoginResponse) packet));
         register(CharacterListResponse.class,
-                packet -> listener.onCharacterListResponse((CharacterListResponse) packet));
+            packet -> listener.onCharacterListResponse((CharacterListResponse) packet));
         register(CreateCharacterResponse.class,
-                packet -> listener.onCreateCharacterResponse((CreateCharacterResponse) packet));
+            packet -> listener.onCreateCharacterResponse((CreateCharacterResponse) packet));
         register(DeleteCharacterResponse.class,
-                packet -> listener.onDeleteCharacterResponse((DeleteCharacterResponse) packet));
+            packet -> listener.onDeleteCharacterResponse((DeleteCharacterResponse) packet));
         register(AchievementListResponse.class,
-                packet -> listener.onAchievementListResponse((AchievementListResponse) packet));
+            packet -> listener.onAchievementListResponse((AchievementListResponse) packet));
         register(LocalizationResponse.class,
-                packet -> handleLocalizationResponse((LocalizationResponse) packet));
+            packet -> handleLocalizationResponse((LocalizationResponse) packet));
+        register(SaveAccountSettingsResponse.class,
+            packet -> listener.onSaveAccountSettingsResponse((SaveAccountSettingsResponse) packet));
     }
 
     /**

@@ -9,6 +9,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
+import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisScrollPane;
 import com.kotcrab.vis.ui.widget.VisTable;
@@ -91,20 +92,29 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         }
 
         for (AccountAchievement ach : achievements) {
-            // AssetManager'dan iconId'ye göre texture çekilebilir, yoksa geçici renk üret
-            Texture icon = createPlaceholderTexture(getFactionColor(ach.keyName()));
-            disposables.add(icon);
+            String regionName = ach.iconId() + "_normal";
+            TextureRegion iconRegion = null;
+
+            if (VisUI.isLoaded()) {
+                if (VisUI.getSkin().has(regionName, TextureRegion.class)) {
+                    iconRegion = VisUI.getSkin().getRegion(regionName);
+                } else {
+                    // Fallback: Eğer veritabanındaki ikon atlasta yoksa soru işaretini bas
+                    iconRegion = VisUI.getSkin().getRegion("question_normal");
+                    Gdx.app.log("AchievementsScreen", "İkon atlasta bulunamadı, fallback kullanıldı: " + regionName);
+                }
+            }
 
             // Dil anahtarlarını tercüme ettiriyoruz
             String translatedTitle = game.getLanguageManager().get(ach.titleLocKey());
             String translatedDesc = game.getLanguageManager().get(ach.descLocKey());
 
-            VisTable row = createAchievementRow(icon, translatedTitle, translatedDesc, rowBgDrawable, ach.isUnlocked());
+            VisTable row = createAchievementRow(iconRegion, translatedTitle, translatedDesc, rowBgDrawable, ach.isUnlocked());
             scrollTable.add(row).growX().padBottom(5).row();
         }
     }
 
-    private VisTable createAchievementRow(Texture icon, String title, String description, TextureRegionDrawable background, boolean isUnlocked) {
+    private VisTable createAchievementRow(TextureRegion icon, String title, String description, TextureRegionDrawable background, boolean isUnlocked) {
         VisTable rowTable = new VisTable();
         rowTable.setBackground(background);
         rowTable.pad(10);

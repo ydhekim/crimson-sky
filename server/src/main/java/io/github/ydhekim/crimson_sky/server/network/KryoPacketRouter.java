@@ -3,10 +3,7 @@ package io.github.ydhekim.crimson_sky.server.network;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.network.packet.*;
 import io.github.ydhekim.crimson_sky.server.network.handler.*;
-import io.github.ydhekim.crimson_sky.server.service.AchievementService;
-import io.github.ydhekim.crimson_sky.server.service.CharacterService;
-import io.github.ydhekim.crimson_sky.server.service.LocalizationService;
-import io.github.ydhekim.crimson_sky.server.service.UserService;
+import io.github.ydhekim.crimson_sky.server.service.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,13 +15,15 @@ public class KryoPacketRouter implements PacketRouter {
     public KryoPacketRouter(UserService userService,
                             CharacterService characterService,
                             LocalizationService localizationService,
-                            AchievementService achievementService) {
+                            AchievementService achievementService,
+                            AccountService accountService) {
         handlers.put(LoginRequest.class, new LoginRequestHandler(userService));
         handlers.put(CharacterListRequest.class, new CharacterListRequestHandler(characterService));
         handlers.put(CreateCharacterRequest.class, new CreateCharacterRequestHandler(characterService));
         handlers.put(DeleteCharacterRequest.class, new DeleteCharacterRequestHandler(characterService));
         handlers.put(LocalizationRequest.class, new LocalizationRequestHandler(localizationService));
         handlers.put(AchievementListRequest.class, new AchievementListRequestHandler(achievementService));
+        handlers.put(SaveAccountSettingsRequest.class, new SaveAccountSettingsRequestHandler(accountService));
     }
 
     @Override

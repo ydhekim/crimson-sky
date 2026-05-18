@@ -12,10 +12,11 @@ public class KryoPacketRouterFactory implements PacketRouterFactory {
     @Override
     public PacketRouter create(ServiceRegistry serviceRegistry) {
         return new KryoPacketRouter(
-                serviceRegistry.getUserService(),
-                serviceRegistry.getCharacterService(),
-                serviceRegistry.getLocalizationService(),
-                serviceRegistry.getAchievementService());
+            serviceRegistry.getUserService(),
+            serviceRegistry.getCharacterService(),
+            serviceRegistry.getLocalizationService(),
+            serviceRegistry.getAchievementService(),
+            serviceRegistry.getAccountService());
     }
 }
 
