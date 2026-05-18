@@ -58,6 +58,7 @@ public class AssetLoader {
         // Load assets
         assetManager.load("background.png", Texture.class);
         assetManager.load("demir_avaz_ui_buttons.atlas", TextureAtlas.class);
+        assetManager.load("achievements/achievements.atlas", TextureAtlas.class);
         assetManager.load("default-font.ttf", BitmapFont.class, fontParameter);
 
         // Block until all assets are loaded

@@ -147,7 +147,7 @@ public class CharacterCreationScreen extends BaseScreen {
         new Tooltip.Builder(description).target(infoButton).build();
         rowTable.add(infoButton).padRight(5);
 
-        VisProgressBar progressBar = new VisProgressBar(0, MAX_STAT_VALUE, 1, false);
+        VisProgressBar progressBar = new VisProgressBar(0, MAX_STAT_VALUE, 1, false, "stat-bar");
         progressBar.setValue(stats.get(name));
         statProgressBars.put(name, progressBar);
         rowTable.add(progressBar).expandX().fillX().padRight(10);
@@ -158,13 +158,13 @@ public class CharacterCreationScreen extends BaseScreen {
 
         // Use UIButtonBuilder for stat adjustment buttons
         TextButton minusButton = new UIButtonBuilder("-")
-            .withStyle(customButtonStyle)
+            .withStyle(squareButtonStyle)
             .withSize(16, 16)
             .withAction(() -> adjustStat(name, -1))
             .build();
 
         TextButton plusButton = new UIButtonBuilder("+")
-            .withStyle(customButtonStyle)
+            .withStyle(squareButtonStyle)
             .withSize(16, 16)
             .withAction(() -> adjustStat(name, 1))
             .build();

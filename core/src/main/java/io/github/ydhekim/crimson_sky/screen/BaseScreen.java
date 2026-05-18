@@ -31,6 +31,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     protected Viewport viewport;
     protected Image backgroundImage;
     protected TextButton.TextButtonStyle customButtonStyle;
+    protected TextButton.TextButtonStyle squareButtonStyle;
 
     protected static final float VIRTUAL_WIDTH = 1280f;
     protected static final float VIRTUAL_HEIGHT = 720f;
@@ -74,6 +75,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     private void setupButtonStyle() {
         if (VisUI.isLoaded()) {
             customButtonStyle = VisUI.getSkin().get("custom", TextButton.TextButtonStyle.class);
+            squareButtonStyle = VisUI.getSkin().get("square", TextButton.TextButtonStyle.class);
         }
     }
 

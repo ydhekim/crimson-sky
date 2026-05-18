@@ -92,7 +92,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         }
 
         for (AccountAchievement ach : achievements) {
-            String regionName = ach.iconId() + "_normal";
+            String regionName = ach.iconId();
             TextureRegion iconRegion = null;
 
             if (VisUI.isLoaded()) {

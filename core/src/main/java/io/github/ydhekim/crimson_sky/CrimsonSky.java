@@ -70,10 +70,12 @@ public class CrimsonSky extends Game {
         if (!VisUI.isLoaded()) {
             BitmapFont customFont = assetManager.get("default-font.ttf", BitmapFont.class);
             TextureAtlas uiAtlas = assetManager.get("demir_avaz_ui_buttons.atlas", TextureAtlas.class);
+            TextureAtlas achievementsAtlas = assetManager.get("achievements/achievements.atlas", TextureAtlas.class);
 
             VisUI.load();
             VisUI.getSkin().add("default-font", customFont, BitmapFont.class);
             VisUI.getSkin().addRegions(uiAtlas);
+            VisUI.getSkin().addRegions(achievementsAtlas);
             VisUI.getSkin().load(Gdx.files.internal("uiskin.json"));
 
             System.out.println("VisUI initialized with custom assets.");

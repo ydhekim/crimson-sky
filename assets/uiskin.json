@@ -12,6 +12,15 @@
       "font": "default-font",
       "fontColor": "white",
       "overFontColor": "light_gray"
+    },
+    "square": {
+      "down": "empty_square_pressed",
+      "up": "empty_square_normal",
+      "over": "empty_square_hover",
+      "disabled": "empty_square_disabled",
+      "font": "default-font",
+      "fontColor": "white",
+      "overFontColor": "light_gray"
     }
   },
   "com.badlogic.gdx.scenes.scene2d.ui.Label$LabelStyle": {
@@ -22,6 +31,16 @@
     "small": {
       "font": "default-font",
       "fontColor": "white"
+    }
+  },
+  "com.badlogic.gdx.scenes.scene2d.ui.ProgressBar$ProgressBarStyle": {
+    "default-horizontal": {
+      "background": "slider_mid",
+      "knobBefore": "fill_mid"
+    },
+    "stat-bar": {
+      "background": "slider_mid",
+      "knobBefore": "fill_mid"
     }
   }
 }
