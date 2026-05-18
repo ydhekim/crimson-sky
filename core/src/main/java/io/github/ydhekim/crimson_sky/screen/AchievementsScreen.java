@@ -2,13 +2,10 @@ package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
@@ -20,6 +17,8 @@ import io.github.ydhekim.crimson_sky.common.model.AccountAchievement;
 import io.github.ydhekim.crimson_sky.common.network.packet.AchievementListRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.AchievementListResponse;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.ui.TextureFactory;
+import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,12 +45,11 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
     }
 
     /**
-     * Ekranın ana iskeletini kurar (Başlık, ScrollPane kabuğu ve Geri butonu)
+     * Sets up the UI shell (Header, ScrollPane, Footer) using Builder patterns.
      */
     private void setupUIShell() {
         VisTable mainPanel = createMainContentPanel();
 
-        // Dil yönetiminden başlığı çekelim
         VisLabel headerLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_ACHIEVEMENTS"));
         headerLabel.setFontScale(1.5f);
         mainPanel.add(headerLabel).pad(20).row();
@@ -59,12 +57,8 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         scrollTable = new VisTable();
         scrollTable.top();
 
-        // Satır arka plan dokusu
-        Pixmap rowBgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        rowBgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.7f));
-        rowBgPixmap.fill();
-        Texture rowBgTexture = new Texture(rowBgPixmap);
-        rowBgPixmap.dispose();
+        // Use TextureFactory for row background texture
+        Texture rowBgTexture = TextureFactory.createSolidTexture(1, 1, new Color(0.15f, 0.15f, 0.15f, 0.7f));
         disposables.add(rowBgTexture);
         rowBgDrawable = new TextureRegionDrawable(new TextureRegion(rowBgTexture));
 
@@ -74,16 +68,13 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         scrollPane.setScrollingDisabled(true, false);
         mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
 
-        // Footer & Back Button
+        // Footer & Back Button using UIButtonBuilder
         VisTable footerTable = new VisTable();
-        TextButton backButton = new TextButton(game.getLanguageManager().get("UI_BTN_BACK"), customButtonStyle);
-        backButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new MainMenuScreen(game));
-            }
-        });
-        footerTable.add(backButton).width(200).height(40).left();
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_BACK"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(() -> game.getScreenRouter().navigateTo(ScreenType.MAIN_MENU))
+            .buildAndAddTo(footerTable);
         footerTable.add().expandX();
         mainPanel.add(footerTable).expandX().fillX();
     }
@@ -156,13 +147,11 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         });
     }
 
+    /**
+     * Creates achievement placeholder texture using TextureFactory.
+     */
     private Texture createPlaceholderTexture(Color color) {
-        Pixmap pixmap = new Pixmap(64, 64, Pixmap.Format.RGBA8888);
-        pixmap.setColor(color);
-        pixmap.fill();
-        Texture texture = new Texture(pixmap);
-        pixmap.dispose();
-        return texture;
+        return TextureFactory.createSolidTexture(64, 64, color);
     }
 
     private Color getFactionColor(String keyName) {

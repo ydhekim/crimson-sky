@@ -1,21 +1,33 @@
 package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
+import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
+import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
+/**
+ * Main menu screen with navigation options.
+ * Refactored to use ScreenRouter for dependency-injected navigation.
+ * Uses Command Pattern (ClickListener) for button actions.
+ * Applies Single Responsibility Principle.
+ */
 public class MainMenuScreen extends BaseScreen {
+    private final ScreenRouter screenRouter;
 
     public MainMenuScreen(final CrimsonSky game) {
         super(game);
+        // Get the ScreenRouter from the game instance
+        this.screenRouter = game.getScreenRouter();
         setupUI();
     }
 
+    /**
+     * Sets up the main menu UI with navigation buttons using UIButtonBuilder.
+     */
     private void setupUI() {
         VisTable mainPanel = createMainContentPanel();
 
@@ -25,43 +37,56 @@ public class MainMenuScreen extends BaseScreen {
 
         Table buttonTable = new Table();
 
-        TextButton charactersButton = new TextButton("Characters", customButtonStyle);
-        charactersButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new CharactersScreen(game));
-            }
-        });
+        // Build buttons using UIButtonBuilder + Command Pattern
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_CHARACTERS"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(this::navigateToCharacters)
+            .buildAndAddTo(buttonTable, 15);
+        buttonTable.row();
 
-        TextButton achievementsButton = new TextButton("Achievements", customButtonStyle);
-        achievementsButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new AchievementsScreen(game)); // Navigate to Achievements Screen
-            }
-        });
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_ACHIEVEMENTS"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(this::navigateToAchievements)
+            .buildAndAddTo(buttonTable, 15);
+        buttonTable.row();
 
-        TextButton settingsButton = new TextButton("Settings", customButtonStyle);
-        settingsButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                // TODO: Navigate to Settings Screen
-            }
-        });
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_SETTINGS"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(() -> Gdx.app.log("MainMenuScreen", "Settings not yet implemented."))
+            .buildAndAddTo(buttonTable, 15);
+        buttonTable.row();
 
-        TextButton exitButton = new TextButton("Exit", customButtonStyle);
-        exitButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
-            }
-        });
-
-        buttonTable.add(charactersButton).width(200).height(40).padBottom(15).row();
-        buttonTable.add(achievementsButton).width(200).height(40).padBottom(15).row();
-        buttonTable.add(settingsButton).width(200).height(40).padBottom(15).row();
-        buttonTable.add(exitButton).width(200).height(40).padBottom(15).row();
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_EXIT"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(Gdx.app::exit)
+            .buildAndAddTo(buttonTable);
 
         mainPanel.add(buttonTable);
+    }
+
+    /**
+     * Navigates to the characters screen via ScreenRouter.
+     */
+    private void navigateToCharacters() {
+        Gdx.app.log("MainMenuScreen", "Navigating to Characters screen.");
+        screenRouter.navigateTo(ScreenType.CHARACTERS);
+    }
+
+    /**
+     * Navigates to the achievements screen via ScreenRouter.
+     */
+    private void navigateToAchievements() {
+        Gdx.app.log("MainMenuScreen", "Navigating to Achievements screen.");
+        screenRouter.navigateTo(ScreenType.ACHIEVEMENTS);
+    }
+
+    @Override
+    public void refreshUI() {
+        Gdx.app.log("MainMenuScreen", "Refreshing UI with new localizations.");
+        setupUI();
     }
 }

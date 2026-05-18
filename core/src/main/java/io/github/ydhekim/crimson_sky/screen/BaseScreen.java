@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -18,7 +17,14 @@ import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationResponse;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 
+/**
+ * Base class for all screens in the game.
+ * Provides common initialization, rendering, and resource management.
+ * Applies Template Method Pattern for screen lifecycle.
+ * Uses TextureFactory to decouple texture creation from screen logic.
+ */
 public abstract class BaseScreen extends ScreenAdapter implements NetworkListener {
     protected final CrimsonSky game;
     protected Stage stage;
@@ -39,9 +45,12 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
         stage = new Stage(viewport);
         setupBackground();
         setupButtonStyle();
-        createPanelBackground();
+        initializePanelBackground();
     }
 
+    /**
+     * Sets up the background image from assets.
+     */
     private void setupBackground() {
         if (game.getAssetManager().isLoaded("background.png", Texture.class)) {
             Texture bgTexture = game.getAssetManager().get("background.png", Texture.class);
@@ -51,20 +60,27 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
         }
     }
 
-    private void createPanelBackground() {
-        Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        bgPixmap.setColor(new Color(0.15f, 0.15f, 0.15f, 0.85f));
-        bgPixmap.fill();
-        panelBackgroundTexture = new Texture(bgPixmap);
-        bgPixmap.dispose();
+    /**
+     * Creates the panel background texture using TextureFactory.
+     * Centralizes texture creation logic.
+     */
+    private void initializePanelBackground() {
+        panelBackgroundTexture = TextureFactory.createPanelBackgroundTexture();
     }
 
+    /**
+     * Sets up the custom button style from VisUI skin.
+     */
     private void setupButtonStyle() {
         if (VisUI.isLoaded()) {
             customButtonStyle = VisUI.getSkin().get("custom", TextButton.TextButtonStyle.class);
         }
     }
 
+    /**
+     * Creates the main content panel with background and tables.
+     * Applies Table layout pattern for responsive design.
+     */
     protected VisTable createMainContentPanel() {
         VisTable container = new VisTable();
         container.setFillParent(true);
@@ -80,11 +96,11 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     }
 
     /**
-     * This method should be overridden by screens that need to rebuild their UI
-     * after a significant data change, like receiving localization.
+     * Template method: override in subclasses to refresh UI after data changes.
+     * Called when localization or other significant data changes occur.
      */
     public void refreshUI() {
-        // By default, does nothing.
+        // Default: no-op. Subclasses override as needed.
     }
 
     @Override

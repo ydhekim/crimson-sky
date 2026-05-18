@@ -3,10 +3,8 @@ package io.github.ydhekim.crimson_sky.screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.ObjectMap;
 import com.kotcrab.vis.ui.VisUI;
@@ -18,6 +16,7 @@ import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterRequest;
+import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
 public class CharacterCreationScreen extends BaseScreen {
 
@@ -81,31 +80,31 @@ public class CharacterCreationScreen extends BaseScreen {
     private VisTable createFactionSelectionTable() {
         VisTable factionTable = new VisTable();
 
-        TextButton factionAButton = new TextButton("Faction A", customButtonStyle);
-        TextButton factionBButton = new TextButton("Faction B", customButtonStyle);
-
         factionDescriptionLabel = new VisLabel("Description for Faction A. This faction focuses on might and raw power.", "small");
         factionDescriptionLabel.setWrap(true);
 
-        factionAButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
+        // Use UIButtonBuilder with Command Pattern for faction selection
+        TextButton factionAButton = new UIButtonBuilder("Faction A")
+            .withStyle(customButtonStyle)
+            .withSize(150, 40)
+            .withAction(() -> {
                 selectedFaction = Faction.A;
                 factionDescriptionLabel.setText("Description for Faction A. This faction focuses on might and raw power.");
-            }
-        });
+            })
+            .build();
 
-        factionBButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
+        TextButton factionBButton = new UIButtonBuilder("Faction B")
+            .withStyle(customButtonStyle)
+            .withSize(150, 40)
+            .withAction(() -> {
                 selectedFaction = Faction.B;
                 factionDescriptionLabel.setText("Description for Faction B. This faction is known for its cunning and arcane knowledge.");
-            }
-        });
+            })
+            .build();
 
         Table buttonTable = new Table();
-        buttonTable.add(factionAButton).width(150).height(40).pad(5);
-        buttonTable.add(factionBButton).width(150).height(40).pad(5);
+        buttonTable.add(factionAButton).pad(5);
+        buttonTable.add(factionBButton).pad(5);
 
         factionTable.add(buttonTable).row();
         factionTable.add(new VisScrollPane(factionDescriptionLabel)).expandX().fillX().height(60).padTop(10);
@@ -157,25 +156,21 @@ public class CharacterCreationScreen extends BaseScreen {
         statValueLabels.put(name, valueLabel);
         rowTable.add(valueLabel).width(25).center().padRight(10);
 
-        VisTextButton minusButton = new VisTextButton("-");
-        VisTextButton plusButton = new VisTextButton("+");
+        // Use UIButtonBuilder for stat adjustment buttons
+        TextButton minusButton = new UIButtonBuilder("-")
+            .withStyle(customButtonStyle)
+            .withSize(16, 16)
+            .withAction(() -> adjustStat(name, -1))
+            .build();
 
-        minusButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                adjustStat(name, -1);
-            }
-        });
+        TextButton plusButton = new UIButtonBuilder("+")
+            .withStyle(customButtonStyle)
+            .withSize(16, 16)
+            .withAction(() -> adjustStat(name, 1))
+            .build();
 
-        plusButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                adjustStat(name, 1);
-            }
-        });
-
-        rowTable.add(minusButton).width(30).pad(0, 2, 0, 2);
-        rowTable.add(plusButton).width(30);
+        rowTable.add(minusButton).pad(0, 2, 0, 2);
+        rowTable.add(plusButton);
 
         return rowTable;
     }
@@ -183,66 +178,53 @@ public class CharacterCreationScreen extends BaseScreen {
     private VisTable createFooterTable() {
         VisTable footerTable = new VisTable();
 
-        TextButton backButton = new TextButton("Back", customButtonStyle);
-        TextButton createButton = new TextButton("Create", customButtonStyle);
+        new UIButtonBuilder("Back")
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(() -> game.getScreenRouter().navigateTo(ScreenType.CHARACTERS))
+            .buildAndAddTo(footerTable);
 
-        backButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new CharactersScreen(game));
-            }
-        });
+        footerTable.add().expandX();
 
-        createButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                String characterName = nameField.getText();
-                if (characterName.trim().isEmpty() || characterName.equals("Enter Name")) {
-                    new VisDialog("Invalid Name", "Please enter a valid character name.").button("OK").show(stage);
-                    return;
-                }
-
-                // Construct the Stats object from the UI
-                Stats characterStats = new Stats(
-                    stats.get("Strength"),
-                    stats.get("Dexterity"),
-                    stats.get("Vitality"),
-                    stats.get("Intelligence"),
-                    stats.get("Wisdom"),
-                    stats.get("Spirit"),
-                    stats.get("Speed"),
-                    stats.get("Insight")
-                );
-
-                Character newCharacter = new Character(
-                    0,
-                    0,
-                    characterName,
-                    selectedFaction,
-                    1,
-                    0,
-                    100,
-                    100,
-                    10,
-                    10,
-                    characterStats,
-                    new Inventory(null, null, null),
-                    new Loadout(null, null, null)
-                );
-
-                // Send the complete request to the server
-                game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter));
-
-                // Switch back to the character list screen to await the response
-                game.setScreen(new CharactersScreen(game));
-            }
-        });
-
-        footerTable.add(backButton).width(96).height(32).left();
-        footerTable.add().expandX(); // spacer
-        footerTable.add(createButton).width(96).height(32).right();
+        new UIButtonBuilder("Create")
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(this::submitCharacterCreation)
+            .buildAndAddTo(footerTable);
 
         return footerTable;
+    }
+
+    /**
+     * Validates and submits character creation request.
+     */
+    private void submitCharacterCreation() {
+        String characterName = nameField.getText();
+        if (characterName.trim().isEmpty() || characterName.equals("Enter Name")) {
+            new VisDialog("Invalid Name", "Please enter a valid character name.").button("OK").show(stage);
+            return;
+        }
+
+        Stats characterStats = new Stats(
+            stats.get("Strength"),
+            stats.get("Dexterity"),
+            stats.get("Vitality"),
+            stats.get("Intelligence"),
+            stats.get("Wisdom"),
+            stats.get("Spirit"),
+            stats.get("Speed"),
+            stats.get("Insight")
+        );
+
+        Character newCharacter = new Character(
+            0, 0, characterName, selectedFaction, 1, 0, 100, 100, 10, 10,
+            characterStats,
+            new Inventory(null, null, null),
+            new Loadout(null, null, null)
+        );
+
+        game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter));
+        game.getScreenRouter().navigateTo(ScreenType.CHARACTERS);
     }
 
     private void adjustStat(String name, int amount) {

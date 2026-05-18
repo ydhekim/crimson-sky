@@ -1,17 +1,11 @@
 package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.graphics.Color;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
-import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
-import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.kotcrab.vis.ui.widget.VisDialog;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisScrollPane;
@@ -19,6 +13,11 @@ import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.network.packet.*;
+import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
+import io.github.ydhekim.crimson_sky.ui.CharacterRowBuilder;
+import io.github.ydhekim.crimson_sky.ui.TextureFactory;
+import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
 
 public class CharactersScreen extends BaseScreen implements NetworkListener {
@@ -28,25 +27,20 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     private Array<Character> characters;
     private int maxCharacterSlots = 3;
 
+    private VisTable footerTable;
     private TextButton createCharacterButton;
     private Texture placeholderAvatarTexture;
     private Texture rowBackgroundTexture;
+    private final ScreenRouter screenRouter;
 
     public CharactersScreen(final CrimsonSky game) {
         super(game);
+        this.screenRouter = game.getScreenRouter();
         characters = new Array<>();
 
-        Pixmap pixmap = new Pixmap(64, 64, Pixmap.Format.RGBA8888);
-        pixmap.setColor(Color.DARK_GRAY);
-        pixmap.fill();
-        placeholderAvatarTexture = new Texture(pixmap);
-        pixmap.dispose();
-
-        Pixmap bgPixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
-        bgPixmap.setColor(new Color(0.2f, 0.2f, 0.2f, 0.8f));
-        bgPixmap.fill();
-        rowBackgroundTexture = new Texture(bgPixmap);
-        bgPixmap.dispose();
+        // Use TextureFactory for texture creation (SRP: factory handles pixmap->texture conversion)
+        placeholderAvatarTexture = TextureFactory.createPlaceholderAvatarTexture(64);
+        rowBackgroundTexture = TextureFactory.createRowBackgroundTexture();
 
         setupUI();
         game.getNetworkClient().setListener(this);
@@ -69,31 +63,34 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         scrollPane.setScrollingDisabled(true, false);
         mainPanel.add(scrollPane).expand().fill().padBottom(20).row();
 
-        VisTable footerTable = new VisTable();
-        TextButton backButton = new TextButton(game.getLanguageManager().get("UI_BTN_BACK"), customButtonStyle);
-        backButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new MainMenuScreen(game));
-            }
-        });
-        createCharacterButton = new TextButton("New Character", customButtonStyle);
-        createCharacterButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                if (!createCharacterButton.isDisabled()) {
-                    game.setScreen(new CharacterCreationScreen(game));
-                }
-            }
-        });
+        footerTable = new VisTable();
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_BACK"))
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(() -> screenRouter.navigateTo(ScreenType.MAIN_MENU))
+            .buildAndAddTo(footerTable);
 
-        footerTable.add(backButton).width(200).height(40).left();
         footerTable.add().expandX();
+
+        createCharacterButton = new UIButtonBuilder("New Character")
+            .withStyle(customButtonStyle)
+            .withSize(200, 40)
+            .withAction(this::navigateToCharacterCreation)
+            .build();
         footerTable.add(createCharacterButton).width(200).height(40).right();
 
         mainPanel.add(footerTable).expandX().fillX();
 
         updateList(characters);
+    }
+
+    /**
+     * Navigates to character creation screen using ScreenRouter.
+     */
+    private void navigateToCharacterCreation() {
+        if (!createCharacterButton.isDisabled()) {
+            screenRouter.navigateTo(ScreenType.CHARACTER_CREATION);
+        }
     }
 
     private void fetchCharacters() {
@@ -122,55 +119,22 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         }
     }
 
+    /**
+     * Creates character row using CharacterRowBuilder (Builder + Command Pattern).
+     */
     private Table createCharacterRow(final Character character) {
-        Table row = new Table();
-        row.setBackground(new TextureRegionDrawable(new TextureRegion(rowBackgroundTexture)));
-        row.pad(10);
-
-        // Slot 1: Visual
-        Image avatar = new Image(placeholderAvatarTexture);
-        row.add(avatar).size(64, 64).padRight(20);
-
-        // Slot 2: Info
-        Table infoTable = new Table();
-        infoTable.left();
-        VisLabel nameLabel = new VisLabel(character.name());
-        nameLabel.setFontScale(1.2f);
-        VisLabel levelLabel = new VisLabel("Level: " + character.level());
-        VisLabel expLabel = new VisLabel("EXP: " + character.experience());
-
-        infoTable.add(nameLabel).left().padBottom(5).row();
-        infoTable.add(levelLabel).left().row();
-        infoTable.add(expLabel).left();
-
-        row.add(infoTable).expandX().fillX();
-
-        // Slot 3: Actions
-        Table actionsTable = new Table();
-        TextButton playButton = new TextButton("Play", customButtonStyle);
-        playButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                startGame(character);
-            }
-        });
-
-        TextButton deleteButton = new TextButton("Delete", customButtonStyle);
-        deleteButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                confirmDeleteCharacter(character);
-            }
-        });
-
-        actionsTable.add(playButton).width(96).height(32).padBottom(5).row();
-        actionsTable.add(deleteButton).width(96).height(32);
-
-        row.add(actionsTable).right().padLeft(20);
-
-        return row;
+        return new CharacterRowBuilder(character)
+            .withAvatarTexture(placeholderAvatarTexture)
+            .withRowBackgroundTexture(rowBackgroundTexture)
+            .withButtonStyle(customButtonStyle)
+            .onPlay(() -> startGame(character))
+            .onDelete(() -> confirmDeleteCharacter(character))
+            .build();
     }
 
+    /**
+     * Shows confirmation dialog for character deletion using UIButtonBuilder.
+     */
     private void confirmDeleteCharacter(final Character character) {
         VisDialog dialog = new VisDialog("Delete Character") {
             @Override
@@ -182,25 +146,22 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         };
         dialog.text("Are you sure you want to permanently delete " + character.name() + "?");
 
-        TextButton yesButton = new TextButton("Yes", customButtonStyle);
-        yesButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
+        new UIButtonBuilder("Yes")
+            .withStyle(customButtonStyle)
+            .withSize(96, 32)
+            .withAction(() -> {
                 dialog.hide();
                 game.getNetworkClient().sendTCP(new DeleteCharacterRequest(character.name()));
-            }
-        });
+            })
+            .buildAndAddTo(dialog.getButtonsTable());
+        dialog.getButtonsTable().add().expandX();
 
-        TextButton noButton = new TextButton("No", customButtonStyle);
-        noButton.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                dialog.hide();
-            }
-        });
+        new UIButtonBuilder("No")
+            .withStyle(customButtonStyle)
+            .withSize(96, 32)
+            .withAction(dialog::hide)
+            .buildAndAddTo(dialog.getButtonsTable());
 
-        dialog.getButtonsTable().add(yesButton).width(96).height(32).pad(10);
-        dialog.getButtonsTable().add(noButton).width(96).height(32).pad(10);
 
         dialog.show(stage);
     }

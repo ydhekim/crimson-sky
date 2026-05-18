@@ -5,61 +5,37 @@ import com.esotericsoftware.kryonet.Client;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import io.github.ydhekim.crimson_sky.common.network.KryoConfig;
-import io.github.ydhekim.crimson_sky.common.network.packet.*;
 import io.github.ydhekim.crimson_sky.util.LanguageManager;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Consumer;
 
+/**
+ * KryoNet-based implementation of GameClient.
+ * Refactored to use PacketHandlerRegistry for cleaner packet dispatch.
+ * Applies Strategy Pattern and Single Responsibility Principle.
+ */
 public class KryoClient implements GameClient {
     private final Client client;
     private NetworkListener listener;
     private LanguageManager languageManager;
-
-    private final Map<Class<?>, Consumer<Object>> packetHandlers = new HashMap<>();
+    private PacketHandlerRegistry handlerRegistry;
 
     public KryoClient() {
         client = new Client();
         KryoConfig.register(client.getKryo());
 
-        setupHandlers();
-
+        // Add listener for connection events
         client.addListener(new Listener() {
             @Override
             public void received(Connection connection, Object object) {
-                if (object instanceof LocalizationResponse) {
-                    LocalizationResponse response = (LocalizationResponse) object;
-                    Gdx.app.log("KryoClient", "Localization response intercepted.");
-
-                    Gdx.app.postRunnable(() -> {
-                        if (response.success() && languageManager != null) {
-                            languageManager.setTranslations(response.translations());
-                            Gdx.app.log("KryoClient", "LanguageManager updated. Keys: " + response.translations().size());
-                        }
-
-                        if (listener != null) {
-                            listener.onLocalizationResponse(response);
-                            Gdx.app.log("KryoClient", "UI Refresh triggered via Listener.");
-                        }
-                    });
-                    return;
-                }
-
-                if (listener != null) {
-                    Consumer<Object> handler = packetHandlers.get(object.getClass());
-                    if (handler != null) {
-                        Gdx.app.postRunnable(() -> handler.accept(object));
-                    }
-                }
+                KryoClient.this.handlePacketReceived(object);
             }
 
             @Override
             public void connected(Connection connection) {
                 Gdx.app.log("KryoClient", "Connection established.");
                 if (listener != null) {
-                    Gdx.app.postRunnable(() -> listener.onConnected());
+                    Gdx.app.postRunnable(listener::onConnected);
                 }
             }
 
@@ -67,25 +43,21 @@ public class KryoClient implements GameClient {
             public void disconnected(Connection connection) {
                 Gdx.app.log("KryoClient", "Disconnected from server.");
                 if (listener != null) {
-                    Gdx.app.postRunnable(() -> listener.onDisconnected());
+                    Gdx.app.postRunnable(listener::onDisconnected);
                 }
             }
         });
 
-        client.start(); // Start the client thread once and for all.
+        client.start();
     }
 
-    private void setupHandlers() {
-        packetHandlers.put(LoginResponse.class,
-            packet -> listener.onLoginResponse((LoginResponse) packet));
-        packetHandlers.put(CharacterListResponse.class,
-            packet -> listener.onCharacterListResponse((CharacterListResponse) packet));
-        packetHandlers.put(CreateCharacterResponse.class,
-            packet -> listener.onCreateCharacterResponse((CreateCharacterResponse) packet));
-        packetHandlers.put(DeleteCharacterResponse.class,
-            packet -> listener.onDeleteCharacterResponse((DeleteCharacterResponse) packet));
-        packetHandlers.put(AchievementListResponse.class,
-            packet -> listener.onAchievementListResponse((AchievementListResponse) packet));
+    /**
+     * Handles received packets by dispatching to the handler registry.
+     */
+    private void handlePacketReceived(Object object) {
+        if (handlerRegistry != null) {
+            handlerRegistry.dispatch(object);
+        }
     }
 
     @Override
@@ -103,6 +75,10 @@ public class KryoClient implements GameClient {
     @Override
     public void setListener(NetworkListener listener) {
         this.listener = listener;
+        // Initialize handler registry when listener is set
+        if (this.listener != null) {
+            this.handlerRegistry = new PacketHandlerRegistry(this.listener, this.languageManager);
+        }
     }
 
     @Override
@@ -114,9 +90,6 @@ public class KryoClient implements GameClient {
     public void sendTCP(Object packet) {
         if (client.isConnected()) {
             client.sendTCP(packet);
-            if (packet instanceof LocalizationRequest) {
-                 Gdx.app.log("KryoClient", "Localization request sent.");
-            }
         } else {
             Gdx.app.error("KryoClient", "Cannot send TCP packet, client is not connected.");
         }
