@@ -10,9 +10,16 @@ dependencies {
   api("com.github.crykn:kryonet:$kryoNetVersion")
   api "com.esotericsoftware:kryo:5.6.0"
 
+  testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+  testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
   if(enableGraalNative == 'true') {
     implementation "io.github.berstanio:gdx-svmhelper-annotations:$graalHelperVersion"
   }
+}
+
+test {
+  useJUnitPlatform()
 }
 
 jar {
