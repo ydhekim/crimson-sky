@@ -1,7 +1,9 @@
 package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.Array;
 import com.kotcrab.vis.ui.widget.*;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
@@ -19,6 +21,7 @@ public class SettingsScreen extends BaseScreen {
 
     private final ScreenRouter screenRouter;
     private VisSelectBox<String> languageSelectBox;
+    private VisSelectBox<String> resolutionSelectBox;
     private VisSlider volumeSlider;
     private VisCheckBox fullscreenCheckBox;
     private final Map<String, String> languageMap = new HashMap<>();
@@ -73,6 +76,25 @@ public class SettingsScreen extends BaseScreen {
         contentTable.add(languageLabel).padRight(20);
         contentTable.add(languageSelectBox).width(200).padBottom(20).row();
 
+        VisLabel resolutionLabel = new VisLabel("Resolution:"); // İleride yerelleştirme anahtarı bağlanabilir
+        resolutionSelectBox = new VisSelectBox<>();
+        resolutionSelectBox.setItems("1280x720", "1600x900", "1920x1080");
+
+        // Buraya ağ paketinden veya yerel ayarlardan gelen güncel çözünürlük verisini bağlayabilirsiniz.
+        // Örnek varsayılan kilit:
+        resolutionSelectBox.setSelected("1280x720");
+
+        // Çözünürlük değiştiğinde anında pencereyi boyutlandırmasını sağlayan dinleyici
+        resolutionSelectBox.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                applyResolution(resolutionSelectBox.getSelected(), fullscreenCheckBox.isChecked());
+            }
+        });
+
+        contentTable.add(resolutionLabel).padRight(20).left();
+        contentTable.add(resolutionSelectBox).width(200).padBottom(20).row();
+
         VisLabel fullscreenLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_FULLSCREEN"));
         fullscreenCheckBox = new VisCheckBox("");
         fullscreenCheckBox.setChecked(Gdx.graphics.isFullscreen());
@@ -100,14 +122,35 @@ public class SettingsScreen extends BaseScreen {
         mainPanel.add(footerTable).expandX().fillX();
     }
 
+    private void applyResolution(String resolutionStr, boolean isFullscreen) {
+        if (resolutionStr == null || !resolutionStr.contains("x")) return;
+
+        try {
+            String[] parts = resolutionStr.split("x");
+            int width = Integer.parseInt(parts[0]);
+            int height = Integer.parseInt(parts[1]);
+
+            if (isFullscreen) {
+                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
+            } else {
+                Gdx.graphics.setWindowedMode(width, height);
+            }
+            Gdx.app.log("SettingsScreen", "Pencere boyutu güncellendi: " + resolutionStr + " (Fullscreen: " + isFullscreen + ")");
+        } catch (Exception e) {
+            Gdx.app.error("SettingsScreen", "Çözünürlük uygulanırken hata oluştu", e);
+        }
+    }
+
     private void saveSettings() {
         String selectedLanguageName = languageSelectBox.getSelected();
         String selectedLangCode = languageMap.get(selectedLanguageName);
+        String selectedResolution = resolutionSelectBox.getSelected();
 
         AccountSettings accountSettings = new AccountSettings(
             volumeSlider.getValue(),
             selectedLangCode,
-            fullscreenCheckBox.isChecked());
+            fullscreenCheckBox.isChecked(),
+            selectedResolution);
 
         game.getLanguageManager().setCurrentLang(selectedLangCode);
         game.getNetworkClient().sendTCP(new SaveAccountSettingsRequest(accountSettings));

@@ -35,7 +35,7 @@ public interface UserDao {
     @Transaction
     default Account createUserAndAccount(PlatformType platformType, String token) {
         long userId = insertUser(platformType.name(), token);
-        AccountSettings defaultSettings = new AccountSettings(0.5, "en_US", true);
+        AccountSettings defaultSettings = AccountSettings.createDefault();
         long accountId = insertAccount(userId, defaultSettings);
         return findAccountByUserId(userId).orElseThrow(() -> new IllegalStateException("Failed to retrieve created account"));
     }
