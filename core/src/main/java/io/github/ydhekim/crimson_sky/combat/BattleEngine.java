@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.combat;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.ObjectMap;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
@@ -44,6 +45,15 @@ public class BattleEngine {
     private final BattleSession session;
     private final SplittableRandom rng;
     private final Array<BattleParticipant> priorityOrder;
+
+    /**
+     * Every turn's Result Set, per participant, in turn order (story B4). {@link TurnResultComponent}
+     * only ever holds the <i>latest</i> turn — each {@link #resolveTurn()} clears and overwrites it —
+     * so a caller that resolves a whole battle in one go (`AttackService`) would otherwise see only
+     * the final turn. A participant that never acted on a turn (killed before its Result Set rolled)
+     * contributes no entry for that turn.
+     */
+    private final ObjectMap<BattleParticipant, Array<Array<ResolvedAction>>> turnHistory = new ObjectMap<>();
 
     private long turnNumber;
     private boolean over;
@@ -209,6 +219,22 @@ public class BattleEngine {
         turnResult.actions.clear();
         turnResult.actions.addAll(compiled);
         turnResult.turnNumber = turnNumber;
+
+        // The component is overwritten next turn; the history keeps its own copy.
+        if (!turnHistory.containsKey(attacker)) {
+            turnHistory.put(attacker, new Array<>());
+        }
+        turnHistory.get(attacker).add(new Array<>(compiled));
+    }
+
+    /**
+     * Every Result Set {@code participant} produced, oldest turn first — the whole battle log a
+     * single-request caller needs (story B4). Empty until at least one turn has resolved; never
+     * {@code null}.
+     */
+    public Array<Array<ResolvedAction>> turnHistoryOf(BattleParticipant participant) {
+        Array<Array<ResolvedAction>> history = turnHistory.get(participant);
+        return history == null ? new Array<>() : history;
     }
 
     /** Turn-cap decision (§4.2): higher remaining HP% → higher SPD → seeded coinflip. */

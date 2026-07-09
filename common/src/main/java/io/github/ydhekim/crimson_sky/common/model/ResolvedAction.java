@@ -14,7 +14,7 @@ package io.github.ydhekim.crimson_sky.common.model;
  * not yet its damage; it defaults {@code damage} to {@code 0}.
  *
  * <p>Registered in {@code KryoConfig} (after the existing entries) because it rides inside
- * {@code CombatActionResponse.actions()} once combat packets are exchanged (system design §5/§6).
+ * {@code AttackResponse.turns()} once combat packets are exchanged (system design §5/§6).
  */
 public record ResolvedAction(
     ActionSource source,

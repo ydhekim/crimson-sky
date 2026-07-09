@@ -22,12 +22,26 @@ public interface CharacterDao {
     Optional<CharacterEntity> findById(@Bind("characterId") long characterId);
 
     /**
-     * Matchmaking rating only (story B1). Deliberately narrow rather than widening the shared
-     * {@code Character} record with an {@code elo} field: only the pairing logic reads it today.
+     * Opponent-selection rating only. Deliberately narrow rather than widening the shared
+     * {@code Character} record with an {@code elo} field: only opponent selection reads it today.
      * Story C1 is where Elo becomes client-visible and gets written back.
      */
     @SqlQuery("SELECT elo FROM characters WHERE id = :characterId")
     Optional<Integer> getElo(@Bind("characterId") long characterId);
+
+    /**
+     * Opponent candidates for an attack (story B4): every persisted character inside the Elo band,
+     * excluding the requester itself. The caller picks randomly among them — deliberately not
+     * "closest Elo", which would make matchups predictable fight after fight (system design §7).
+     */
+    @SqlQuery("SELECT * FROM characters WHERE id <> :characterId AND elo BETWEEN :minElo AND :maxElo")
+    List<CharacterEntity> findOpponentCandidatesInEloRange(@Bind("characterId") long characterId,
+                                                           @Bind("minElo") int minElo,
+                                                           @Bind("maxElo") int maxElo);
+
+    /** The unbounded-Elo widening step, used when no candidate falls inside the band (system design §7). */
+    @SqlQuery("SELECT * FROM characters WHERE id <> :characterId")
+    List<CharacterEntity> findAllOpponentCandidates(@Bind("characterId") long characterId);
 
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE name = :name)")
     boolean isNameTaken(@Bind("name") String name);
