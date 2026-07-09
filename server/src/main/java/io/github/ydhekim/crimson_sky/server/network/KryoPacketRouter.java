@@ -15,6 +15,7 @@ public class KryoPacketRouter implements PacketRouter {
     public KryoPacketRouter(UserService userService,
                             CharacterService characterService,
                             CombatService combatService,
+                            MatchmakingService matchmakingService,
                             LocalizationService localizationService,
                             AchievementService achievementService,
                             AccountService accountService) {
@@ -23,6 +24,7 @@ public class KryoPacketRouter implements PacketRouter {
         handlers.put(CreateCharacterRequest.class, new CreateCharacterRequestHandler(characterService));
         handlers.put(DeleteCharacterRequest.class, new DeleteCharacterRequestHandler(characterService));
         handlers.put(CombatActionRequest.class, new CombatActionRequestHandler(combatService));
+        handlers.put(MatchmakingRequest.class, new MatchmakingRequestHandler(matchmakingService, combatService));
         handlers.put(LocalizationRequest.class, new LocalizationRequestHandler(localizationService));
         handlers.put(AchievementListRequest.class, new AchievementListRequestHandler(achievementService));
         handlers.put(SaveAccountSettingsRequest.class, new SaveAccountSettingsRequestHandler(accountService));

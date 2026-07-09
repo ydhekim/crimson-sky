@@ -7,6 +7,11 @@ application.mainClass = 'io.github.ydhekim.crimson_sky.server.Main'
 
 dependencies {
   api project(':common')
+  // The combat engine (BattleEngine/BattleSession/BattleParticipant) and the Ashley ECS layer it
+  // drives live in :core; the server runs them authoritatively (system design §4.1 wiring gap, §6).
+  // This transitively pulls core's client-only UI libs (vis-ui, gdx-freetype) onto the server
+  // classpath — expected and harmless, nothing server-side calls into UI code.
+  api project(':core')
   api("com.github.crykn:kryonet:$kryoNetVersion")
   api "com.esotericsoftware:kryo:5.6.0"
   api "com.zaxxer:HikariCP:$hikariCpVersion"
@@ -34,6 +39,13 @@ dependencies {
 
   // PostgreSQL için Flyway Veritabanı Desteği (Flyway 10+ için şart)
   implementation "org.flywaydb:flyway-database-postgresql:12.6.0"
+
+  testImplementation "org.junit.jupiter:junit-jupiter:$junitVersion"
+  testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+test {
+  useJUnitPlatform()
 }
 
 jar {
