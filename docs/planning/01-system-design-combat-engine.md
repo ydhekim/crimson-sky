@@ -176,47 +176,59 @@ This session's content-design pass: instead of one equipped weapon and one equip
 ## 5. New common records (`common/model` + `common/network/packet`)
 
 ```java
-public record ResolvedAction(ActionSource source, String label, int frequency, boolean failed) {}
+public record ResolvedAction(ActionSource source, String label, int frequency, boolean failed, int damage) {}
 public enum ActionSource { WEAPON, SKILL, PUNCH, PET }
 
-public record CombatActionRequest(long battleId, long characterId, Long skillId /* nullable */) {}
-public record CombatActionResponse(long battleId, long turnNumber, Array<ResolvedAction> actions) {}
+public record AttackRequest(long characterId) {}
+public record AttackResponse(long battleId, String opponentDisplayName, boolean won,
+                             Array<Array<ResolvedAction>> turns) {}
 ```
 
-These follow the existing record + `RecordSerializer` convention. **Register them at the end of `KryoConfig.register()`**, after the existing entries — registration order is positional and must stay identical on both sides, per the existing convention documented in `CLAUDE.md`. Do not reorder existing registrations.
+**Superseded 2026-07-09** (async matchmaking redesign — see §7): `CombatActionRequest`/`CombatActionResponse` and `MatchmakingRequest`/`MatchmakingFoundResponse` (all four already implemented per the B1/B3 pass) are replaced by the single `AttackRequest`/`AttackResponse` pair above. The live, multi-request "advance this battle by one turn" model they supported no longer applies once a whole battle resolves synchronously in one call — see §7 for why. `opponentDisplayName` is a `String`, not a `characterId`, deliberately: whether the opponent was a real persisted character or a synthesized bot must never be distinguishable from the response shape (§7's transparency decision) or from anything else observable client-side, not just hidden in the UI.
+
+These follow the existing record + `RecordSerializer` convention. **Register them at the end of `KryoConfig.register()`**, after the existing entries — registration order is positional and must stay identical on both sides, per the existing convention documented in `CLAUDE.md`. Do not reorder existing registrations. (The four superseded packet classes and their registrations should be removed, not left dead — nothing should reference them once `AttackRequest`/`Response` land.)
 
 ## 6. Networking / handler wiring (M2/M3)
 
 Follows the exact existing pattern (`CLAUDE.md` §"Networking: packet flow end-to-end") — no new pattern introduced:
 
-- Client: `GameClient` sends `CombatActionRequest` → server `KryoPacketRouter.route()` dispatches to a new `CombatActionRequestHandler implements RequestHandler<CombatActionRequest>` (server/network/handler) → calls a new `CombatService` (server/service, registered in `ServiceRegistry` like the others) → `CombatService` runs the Ashley engine tick for that battle → returns `CombatActionResponse`.
-- Client: response arrives via `NetworkListener` → `PacketHandlerRegistry` dispatches by class → `Consumer` posts onto the render thread and hands the `Array<ResolvedAction>` to whatever the M4 `CombatScreen` needs.
+- Client: `GameClient` sends `AttackRequest` → server `KryoPacketRouter.route()` dispatches to `AttackRequestHandler implements RequestHandler<AttackRequest>` (server/network/handler) → calls `AttackService` (server/service, registered in `ServiceRegistry`) → `AttackService` finds an opponent (§7), builds both `BattleParticipant`s, runs the battle to completion, persists the outcome, and returns `AttackResponse` — all inside this one call.
+- Client: response arrives via `NetworkListener` → `PacketHandlerRegistry` dispatches by class → hands the full `turns` array to the M4 `CombatScreen`, which plays every turn back in sequence (extending the single-turn playback §10 already describes, not a new mechanism).
 
-**Security guardrail (non-negotiable, checked against existing code):** `CharacterListRequestHandler` and `DeleteCharacterRequestHandler` already validate `connection.account != null` and scope every DB call by `connection.account.id()` — never trusting a client-supplied account ID. `CombatActionRequestHandler` must follow the identical pattern: validate that `CombatActionRequest.characterId()` actually belongs to `connection.account` before running any combat resolution. Don't trust the client-supplied `characterId`/`battleId` beyond that ownership check.
+**Security guardrail (unchanged):** `AttackRequestHandler` validates `connection.account != null` and that `AttackRequest.characterId()` belongs to `connection.account`, exactly as `CharacterListRequestHandler`/`DeleteCharacterRequestHandler` already do. There is no client-supplied `battleId`/opponent id to validate against anymore (§7) — the server picks the opponent, so the participation-check half of the old B3 guardrail no longer has anything to check.
 
-## 7. Matchmaking (M3)
+## 7. Matchmaking (M3) — async, no live queue
 
-Minimal viable version, same architectural style as everything else:
+**Redesigned 2026-07-09, replacing the live-queue version B1 originally implemented.** The live-queue model (both players connected simultaneously, a waiting room, a multi-turn session) assumed a form of real-time coordination this game never needed: combat has no manual input, no live decisions, nothing that benefits from both sides being present at once. Forcing that synchronicity imports real-time-matchmaking failure modes — thin-population starvation, Elo-widening unfairness, a "nobody's playing" perception — for no gameplay payoff. The fix is the Clash-of-Clans shape: attack a *persisted snapshot* of an opponent, resolved instantly, no live opponent required.
 
-- `MatchmakingRequest` / `MatchmakingFoundResponse` packets (common), TCP.
-- Server-side in-memory queue (no new DB table needed for the queue itself — it's transient), matched by Elo range (Elo lives with the account/character, see §8).
-- On match, server creates a `BattleSession` and returns `MatchmakingFoundResponse` to both clients.
-- `BattleSession` lifecycle owned by a new `BattleSessionRegistry`, mirroring how `ServiceRegistry` and `ScreenRouter` already manage lifecycle/caching elsewhere in this codebase — keeps the manual-DI style consistent rather than introducing a new pattern.
+**Opponent selection**, in order:
+1. Query for a persisted character within `±100` Elo (same constant as the old `MatchmakingService.BASE_ELO_RANGE`) of the requester, excluding the requester itself. Pick randomly among candidates, not simply the closest — an always-closest pick makes outcomes too predictable turn over turn.
+2. If none found, widen to an unbounded Elo range and try again. Unlike the old design, there's no "wait and see if someone joins" — everything resolves within the one request, so widening happens immediately rather than after a timeout.
+3. If still nothing (e.g. an empty table), synthesize a bot character.
 
-**Forward-compatible design decision:** model `BattleSession` participants as `Array<BattleParticipant>` (each holding a character entity reference + its `BattleStateComponent`), not two hardcoded fields (`characterA`/`characterB`). Only 1v1 ships at launch — the matchmaking queue and `TurnOrderSystem` only ever populate two entries for now — but raids and other N-participant content are on the long-term idea list (see project plan §8), and retrofitting a hardcoded two-player battle model later is a much bigger rewrite than starting with a collection that happens to contain two entries today. This costs nothing extra now.
+**Bot generation.** Stats/loadout drawn from `04-starter-content.md`'s items, assembled into one of a small set of curated archetype templates (tank/dps/dodge-leaning stat distributions) chosen at random per fight, with a total stat budget scaled to the requester's own Elo so difficulty roughly tracks skill/progression. Decided this session: bot fights **count fully** toward Elo and rewards, identically to a real opponent — which means bot calibration is load-bearing, not cosmetic. A miscalibrated bot isn't a curiosity, it's either a farmable exploit or an unexplained wall, and since bots are never disclosed (below), a player has no way to discount a loss as "oh, just a bot." Get the stat-budget-vs-Elo curve right before this ships, and expect a tuning pass same as every other numeric system in this doc.
+
+**Transparency — decided, non-negotiable:** a bot must be indistinguishable from a real opponent, at every layer, not just the UI. `AttackResponse` carries an `opponentDisplayName` (`String`), never a `characterId` the client could use to look anything real up — this is a protocol-level guarantee, not just a client-side display choice. Whether a fight was against a bot is recorded server-side only (see §8's `battle_history.opponent_is_bot` note) for analytics/anti-abuse, never serialized to the client.
+
+**Whole-battle resolution, one response.** `AttackService` builds both `BattleParticipant`s (unchanged — `BattleParticipant.fromCharacter`) into a fresh `BattleSession`/`BattleEngine` (unchanged) and resolves the entire match before responding — no session persists across multiple requests, so there is nothing for a registry to track and nothing to leak if a client disconnects mid-fight (there's no "mid-fight" from the network's perspective). **Implementation gap to close, not just a formality:** `BattleEngine.runToCompletion()` as it exists today only leaves the *final* turn's `TurnResultComponent` behind — each call to `resolveTurn()` clears and overwrites it. Returning the full `turns` array this section's `AttackResponse` needs means either (a) `AttackService` calls `resolveTurn()` itself in a loop and copies each turn's Result Set out immediately after each call (reuses `BattleEngine` as-is, more calling-code responsibility), or (b) `BattleEngine` grows its own accumulating per-participant turn history so `runToCompletion()` can hand back the whole log directly (cleaner call site, a real change to already-tested engine code). Flagging both rather than picking one — this is Claude Code's call at implementation time, see the prompt.
+
+**What this retires:** `MatchmakingService`'s queue (and the two bugs living in it, K2/K3 — see backlog), `BattleSessionRegistry`/`ActiveBattle`'s multi-request session lifecycle, and the "how does the opposing client learn what happened" question (§6, previously open) — there is no live opposing client in this model at all. `BattleSession`/`BattleParticipant`/`BattleEngine`/`ActionResolver`/`DamageCalculator`/`PetResolver` are unaffected; they don't know or care whether they're invoked once synchronously or across several requests.
+
+**Forward-compatible design decision (unchanged):** `BattleSession` participants stay an `Array<BattleParticipant>`, not two hardcoded fields, for the same raids-later reason as before (project plan §8) — nothing about this redesign touches that.
 
 ## 8. Persistence additions (M3)
 
-New Flyway migration, next in sequence after V5. Checked against the actual `V1__Initial_Schema.sql`: the table is `characters` (plural), PKs are `SERIAL`/`INTEGER` (not `BIGSERIAL`/`BIGINT`), and there is no `elo` column anywhere yet — it needs to be added, most likely on `accounts` or `characters` alongside `experience`. Starting point:
+**Updated 2026-07-09 — `elo` already landed, `battle_history` is next.** `V6` went to Stamina and `V7__Add_Character_Elo.sql` already added `characters.elo` (both ahead of plan, from the M2/B1 implementation passes) — `battle_history` is now **V8**, not V6. Checked against the actual `V1__Initial_Schema.sql`: the table is `characters` (plural), PKs are `SERIAL`/`INTEGER` (not `BIGSERIAL`/`BIGINT`).
+
+**New column vs. the original sketch, required by the async/bot redesign (§7):** a bot opponent has no row in `characters` at all, so `opponent_character_id` can't stay `NOT NULL` — and the server needs to know internally which fights were against a bot (analytics, anti-abuse tuning) even though the client is never told (§7's transparency decision). Starting point, revised:
 
 ```sql
--- V6__Battle_History.sql
-ALTER TABLE characters ADD COLUMN elo INTEGER NOT NULL DEFAULT 1000;
-
+-- V8__Battle_History.sql
 CREATE TABLE IF NOT EXISTS battle_history (
     id SERIAL PRIMARY KEY,
     character_id INTEGER NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
-    opponent_character_id INTEGER NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    opponent_character_id INTEGER REFERENCES characters (id) ON DELETE CASCADE, -- NULL when opponent_is_bot
+    opponent_is_bot BOOLEAN NOT NULL DEFAULT FALSE,
     gold_delta INTEGER NOT NULL,
     experience_delta BIGINT NOT NULL,
     elo_delta INTEGER NOT NULL,

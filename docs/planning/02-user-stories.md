@@ -42,7 +42,9 @@ Priority: P1. Size: M. Status: done. *(`WeaponSlotComponent`/`SkillSlotComponent
 
 ## Epic B — Matchmaking & Sessions — M3
 
-**B1.** As a player, I can queue for a match and get paired with an opponent in a similar Elo range.
+**B1 — superseded 2026-07-09 by B4.** *Kept for the record, not deleted: the live-queue design below turned out to be the wrong shape for a game with no real-time input (see B4's rationale) — the combat engine it drove (`BattleEngine`/`BattleParticipant`/`BattleSession`/`ActionResolver`, all of A1–A7) is unaffected and fully reused by B4; only the queue/session-lifecycle plumbing below is retired. K2/K3 (the two bugs found in that plumbing) are retired along with it, not fixed — see their close-out notes.*
+
+As a player, I can queue for a match and get paired with an opponent in a similar Elo range.
 Acceptance criteria: `MatchmakingRequest`/`MatchmakingFoundResponse` round-trip; pairing prefers closest Elo available, falls back to widening range after a timeout (define timeout value when implementing).
 Also closes two gaps B3 deliberately left open, both of which become live the moment this story makes `battleId` resolve to a real `BattleSession`:
 - **Participant check.** B3 validates that `CombatActionRequest.characterId` is owned by `connection.account`, but nothing validates `battleId`. Today that is inert (the handler's turn resolution is a logging stub, so `battleId` is never dereferenced). Once a session is looked up by that id, an *owned* character could submit actions into a battle it is not a participant of. The guardrail needs both halves: character belongs to account **and** character is a participant in that battle.
@@ -56,9 +58,21 @@ Priority: P0. Size: M. Status: done. *(`MatchmakingRequest`/`MatchmakingFoundRes
 **B2.** As the server, I create and track an authoritative `BattleSession` bridging connected clients once matched.
 Acceptance criteria: session holds participants as `Array<BattleParticipant>` (not hardcoded `characterA`/`characterB` fields — see system design §7, this leaves raids possible later without a rewrite), a `SplittableRandom` seed, and per-participant `BattleStateComponent`; cleaned up when the battle ends. Only two participants are ever populated at launch.
 Priority: P0. Size: L. Status: done. *(`BattleSession` now holds `Array<BattleParticipant>` + `end()` cleanup; `BattleParticipant` wraps an Ashley `Entity` (state in components, incl. its `BattleStateComponent` per §7) with a `fromCharacter` battle-setup factory. `BattleEngine` fixes priority once (speed, seeded-coinflip tiebreak), resolves per-turn Result Sets with per-hit dodge/damage/win-condition, the kill-prevents-counter rule, and the turn-40 cap (HP% → SPD → coinflip). `BattleEngineTest` proves the priority-order kill prevents the counter-hit. Matchmaking-driven session creation is B1 (still todo); this delivered the session model + turn engine it will feed.)*
+**Partially superseded 2026-07-09:** "bridging connected clients" no longer applies — B4 resolves a battle synchronously within one request, so nothing tracks a session across multiple requests anymore (`BattleSessionRegistry`/`ActiveBattle` retire with B1). `BattleSession`/`BattleParticipant`/`BattleEngine` themselves are unchanged and still exactly what B4 calls.
 
 **B3.** As the server, I validate that combat-related requests (starting with `CombatActionRequest`) reference a `characterId` owned by `connection.account`, matching the ownership-check pattern already used in `CharacterListRequestHandler`/`DeleteCharacterRequestHandler`.
 Acceptance criteria: a request referencing a character not owned by the connection's account is rejected, not silently processed.
+**Partially superseded 2026-07-09:** the participant-in-this-battle half (added during B1's close-out) retires along with `battleId` itself — `AttackRequest` (B4) carries no client-supplied battle or opponent id, the server picks the opponent, so there is nothing left for that check to validate. The ownership check (character belongs to account) carries forward unchanged into `AttackRequestHandler`.
+
+**B4.** As a player, I can attack a persisted opponent (or a synthesized bot if none is available) and see the result immediately, without needing anyone else online.
+Rationale (replacing B1): this game has no real-time input — no manual actions, no live decisions — so requiring both players present at once bought nothing and imported real-time-matchmaking failure modes (thin-population starvation, Elo-widening unfairness, a "dead game" perception) for a genre that doesn't need synchronicity at all. See system design §7 for the full redesign discussion.
+Acceptance criteria:
+- `AttackRequest(characterId)` → server picks an opponent: a random persisted character within ±100 Elo, widened to unbounded if none found, then a synthesized bot as the last resort (system design §7's bot-generation approach). Ownership-checked (character belongs to `connection.account`) exactly as B3 established; no participant/battle-id check needed since none is client-supplied.
+- The entire battle resolves synchronously in this one call (`BattleEngine` run to completion, not one turn at a time) and `AttackResponse` carries every turn's Result Set, not just the last one — requires closing `BattleEngine.runToCompletion()`'s current gap where only the final turn's `TurnResultComponent` survives (system design §7 flags two implementation options, pick one).
+- Bot fights count fully toward Elo/Gold/Exp, identical to a real opponent (decided 2026-07-09) — which makes the Elo-vs-stat-budget calibration in system design §7 load-bearing, not cosmetic.
+- Bot-vs-real is never distinguishable from the client's perspective at any layer, not just the UI: `AttackResponse` exposes `opponentDisplayName` (a `String`), never a `characterId` the client could resolve. Whether a fight was against a bot is recorded server-side only (`battle_history.opponent_is_bot`, system design §8) for internal analytics.
+- `CombatActionRequest`/`CombatActionResponse` and `MatchmakingRequest`/`MatchmakingFoundResponse` (all four already shipped) are removed, along with `MatchmakingService`, `BattleSessionRegistry`, and `ActiveBattle` — not left dead alongside the new code.
+Priority: P0. Size: L. Status: todo.
 Priority: P0. Size: S. Status: done. *(`CombatActionRequest`/`CombatActionResponse` packets added + registered at the end of `KryoConfig` (with `ResolvedAction`/`ActionSource`). `CombatActionRequestHandler` → `CombatService.isCharacterOwnedBy` (new `CharacterDao.isOwnedByAccount`, fails closed) rejects unauthenticated connections and non-owned characters with a log + early return, matching `CharacterListRequestHandler`/`DeleteCharacterRequestHandler`. Wired through `KryoPacketRouter`/`ServiceRegistry`. Scoped to the ownership guardrail only — actually running the engine tick server-side needs B1 (matchmaking) + `server`→`core`, deliberately deferred; see close-out flags. Two follow-ups this story left open — validating `battleId` participation, and whether a rejection should answer with a failure response instead of dropping silently — are recorded as acceptance criteria on B1, since both only become reachable once `battleId` resolves to a live session.)*
 
 ---
@@ -234,3 +248,9 @@ If something that looks small turns out to touch a system still under active des
 
 **K1.** Split `volumeMaster` into separate music/SFX volume settings in `AccountSettings`, following the existing `field + withX() + JSONB default + slider in SettingsScreen` pattern (new migration for the JSONB default).
 Priority: P2. Size: XS. Status: todo.
+
+**K2.** ~~`MatchmakingRequest`/`MatchmakingFoundResponse` are never registered in `KryoConfig`~~ — **superseded 2026-07-09**, not fixed: both packets are removed entirely by B4's async redesign, along with the `MatchmakingService` code this bug lived in. No action needed beyond making sure B4 doesn't reintroduce it (the new `AttackRequest`/`AttackResponse` must be registered — see system design §5).
+Priority: n/a. Status: superseded by B4.
+
+**K3.** ~~`MatchmakingService.dequeue(connection)` exists but nothing calls it~~ — **superseded 2026-07-09**, not fixed: `MatchmakingService` and its queue retire entirely with B4; there is no connection-cleanup problem in a model with no waiting room.
+Priority: n/a. Status: superseded by B4.
