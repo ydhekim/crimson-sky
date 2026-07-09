@@ -21,11 +21,46 @@ public class FakeCharacterDao implements CharacterDao {
     }
 
     private final Map<Long, Row> rows = new LinkedHashMap<>();
+    private boolean leakRequesterIntoCandidates;
 
     /** Registers {@code character} as owned by {@code accountId}, rated at {@code elo}. */
     public FakeCharacterDao with(Character character, long accountId, int elo) {
         rows.put(character.id(), new Row(character, accountId, elo));
         return this;
+    }
+
+    /**
+     * Makes the candidate queries return the requester too, as a broken/changed {@code WHERE id <>}
+     * clause would. Lets a test prove {@code AttackService} re-excludes the requester itself rather
+     * than trusting one SQL string to do it.
+     */
+    public FakeCharacterDao leakingRequesterIntoCandidates() {
+        this.leakRequesterIntoCandidates = true;
+        return this;
+    }
+
+    @Override
+    public List<CharacterEntity> findOpponentCandidatesInEloRange(long characterId, int minElo, int maxElo) {
+        return candidates(characterId, row -> row.elo() >= minElo && row.elo() <= maxElo);
+    }
+
+    @Override
+    public List<CharacterEntity> findAllOpponentCandidates(long characterId) {
+        return candidates(characterId, row -> true);
+    }
+
+    private List<CharacterEntity> candidates(long characterId, java.util.function.Predicate<Row> filter) {
+        List<CharacterEntity> result = new ArrayList<>();
+        for (Row row : rows.values()) {
+            boolean isRequester = row.character().id() == characterId;
+            if (isRequester && !leakRequesterIntoCandidates) {
+                continue;
+            }
+            if (filter.test(row)) {
+                result.add(CharacterEntity.fromCommonModel(row.accountId(), row.character()));
+            }
+        }
+        return result;
     }
 
     @Override

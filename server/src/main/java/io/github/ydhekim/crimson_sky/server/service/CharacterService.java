@@ -32,10 +32,54 @@ public class CharacterService {
     }
 
     /**
-     * Loads a single character by id, without an owner scope — matchmaking (B1) needs to build a
+     * Ownership guardrail (system design §6/§13): true only when {@code characterId} belongs to
+     * {@code accountId}. Fails closed — any DB error is logged and treated as "not owned", so a lookup
+     * failure can never accidentally authorize an action on someone else's character.
+     */
+    public boolean isCharacterOwnedBy(long accountId, long characterId) {
+        try {
+            return characterDao.isOwnedByAccount(accountId, characterId);
+        } catch (Exception e) {
+            log.error("Ownership check failed for character " + characterId + " / account " + accountId, e);
+            return false;
+        }
+    }
+
+    /**
+     * Opponent candidates within {@code ±eloRange} of {@code characterId}'s own rating, excluding
+     * itself (story B4). Empty when nothing qualifies — the caller widens, then falls back to a bot.
+     */
+    public ServiceResult<List<Character>> findOpponentCandidates(long characterId, int elo, int eloRange) {
+        try {
+            return toCharacters(characterDao.findOpponentCandidatesInEloRange(
+                characterId, elo - eloRange, elo + eloRange));
+        } catch (Exception e) {
+            log.error("Opponent candidate lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    /** The unbounded-Elo widening step (story B4): any persisted character but the requester. */
+    public ServiceResult<List<Character>> findAllOpponentCandidates(long characterId) {
+        try {
+            return toCharacters(characterDao.findAllOpponentCandidates(characterId));
+        } catch (Exception e) {
+            log.error("Unbounded opponent candidate lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    private ServiceResult<List<Character>> toCharacters(List<CharacterEntity> entities) {
+        return ServiceResult.success(MessageCode.SUCCESS, entities.stream()
+            .map(CharacterEntity::toCommonModel)
+            .collect(Collectors.toList()));
+    }
+
+    /**
+     * Loads a single character by id, without an owner scope — an attack (B4) needs to build a
      * {@code BattleParticipant} for the *opponent*, whose account is by definition not the caller's.
-     * Callers acting on behalf of a connection must still run the ownership guardrail
-     * ({@link CombatService#isCharacterOwnedBy}) on the caller's own character id first.
+     * Callers acting on behalf of a connection must still run {@link #isCharacterOwnedBy} on the
+     * caller's own character id first.
      */
     public ServiceResult<Character> getCharacter(long characterId) {
         try {
@@ -51,7 +95,7 @@ public class CharacterService {
         }
     }
 
-    /** Matchmaking rating for a character (story B1). Absent/failed lookups fail as a failure result. */
+    /** Opponent-selection rating for a character. Absent/failed lookups return a failure result. */
     public ServiceResult<Integer> getElo(long characterId) {
         try {
             return characterDao.getElo(characterId)

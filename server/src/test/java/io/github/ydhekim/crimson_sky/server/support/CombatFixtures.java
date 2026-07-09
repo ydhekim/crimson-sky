@@ -36,6 +36,20 @@ public final class CombatFixtures {
         return new Weapon(1L, "Testing Hammer", "", Rarity.COMMON, 2f, 100, 100, 5);
     }
 
+    /**
+     * A defenceless 1 HP opponent with no weapon, skill, or pet — it can only punch (1–5 damage), so
+     * any fixture built by {@link #character} kills it on the first hit that lands.
+     */
+    public static Character frailCharacter(long id, long accountId, String name) {
+        Stats stats = new Stats(10, 0, 1, 10, 0, 1, 0, 0);
+        return new Character(
+            id, accountId, name, Faction.A, 1, 0,
+            1 /* maxHp */, 10 /* maxMp */, 10 /* maxStamina */, 0, 0,
+            stats,
+            new Inventory(new Array<>(), new Array<>(), new Array<>()),
+            new Loadout(new Array<Weapon>(), new Array<Skill>(), new Array<Pet>()));
+    }
+
     /** A character guaranteed to land exactly one 150-damage weapon hit per turn. */
     public static Character character(long id, long accountId, String name) {
         Stats stats = new Stats(

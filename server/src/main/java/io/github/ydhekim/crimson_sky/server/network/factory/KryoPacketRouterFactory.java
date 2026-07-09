@@ -14,8 +14,7 @@ public class KryoPacketRouterFactory implements PacketRouterFactory {
         return new KryoPacketRouter(
             serviceRegistry.getUserService(),
             serviceRegistry.getCharacterService(),
-            serviceRegistry.getCombatService(),
-            serviceRegistry.getMatchmakingService(),
+            serviceRegistry.getAttackService(),
             serviceRegistry.getLocalizationService(),
             serviceRegistry.getAchievementService(),
             serviceRegistry.getAccountService());

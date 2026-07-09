@@ -21,7 +21,7 @@ import io.github.ydhekim.crimson_sky.ecs.component.TurnResultComponent;
  * <p><b>Decision-only.</b> The entries produced here carry {@code damage = 0}: this system compiles
  * <i>what</i> the Result Set is, not <i>how much HP it removes</i>. Per-hit damage/dodge/win-condition
  * application is {@link io.github.ydhekim.crimson_sky.combat.BattleEngine}'s job once two participants
- * exist (system design §4.2/A5). The array serializes directly into {@code CombatActionResponse.actions()}.
+ * exist (system design §4.2/A5). The array serializes directly into one entry of {@code AttackResponse.turns()}.
  */
 public class ResultCompilationSystem extends IteratingSystem {
 

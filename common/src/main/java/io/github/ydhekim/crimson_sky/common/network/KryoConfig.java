@@ -96,14 +96,14 @@ public class KryoConfig {
         kryo.register(Tameness.class);
 
         // Combat (M2) — appended at the end so existing positional IDs above are untouched
-        // (system design §5). ResolvedAction rides inside CombatActionResponse.actions().
+        // (system design §5). ResolvedAction rides inside AttackResponse.turns().
         kryo.register(ActionSource.class);
         kryo.register(ResolvedAction.class, new RecordSerializer<>(ResolvedAction.class));
-        kryo.register(CombatActionRequest.class, new RecordSerializer<>(CombatActionRequest.class));
-        kryo.register(CombatActionResponse.class, new RecordSerializer<>(CombatActionResponse.class));
 
-        // Matchmaking (M3/B1) — likewise appended at the end, after every existing registration.
-        kryo.register(MatchmakingRequest.class, new RecordSerializer<>(MatchmakingRequest.class));
-        kryo.register(MatchmakingFoundResponse.class, new RecordSerializer<>(MatchmakingFoundResponse.class));
+        // Async attack (M3/B4) — one request, one response, the whole battle resolved server-side.
+        // AttackResponse carries no opponent id and no bot flag: a synthesized opponent must be
+        // indistinguishable from a real one at the protocol level (system design §7).
+        kryo.register(AttackRequest.class, new RecordSerializer<>(AttackRequest.class));
+        kryo.register(AttackResponse.class, new RecordSerializer<>(AttackResponse.class));
     }
 }
