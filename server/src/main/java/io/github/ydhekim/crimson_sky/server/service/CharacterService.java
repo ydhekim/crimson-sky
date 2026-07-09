@@ -31,6 +31,41 @@ public class CharacterService {
         }
     }
 
+    /**
+     * Loads a single character by id, without an owner scope — matchmaking (B1) needs to build a
+     * {@code BattleParticipant} for the *opponent*, whose account is by definition not the caller's.
+     * Callers acting on behalf of a connection must still run the ownership guardrail
+     * ({@link CombatService#isCharacterOwnedBy}) on the caller's own character id first.
+     */
+    public ServiceResult<Character> getCharacter(long characterId) {
+        try {
+            return characterDao.findById(characterId)
+                .map(entity -> ServiceResult.success(MessageCode.SUCCESS, entity.toCommonModel()))
+                .orElseGet(() -> {
+                    log.info("Character not found for ID: " + characterId);
+                    return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+                });
+        } catch (Exception e) {
+            log.error("Failed to fetch character for ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    /** Matchmaking rating for a character (story B1). Absent/failed lookups fail as a failure result. */
+    public ServiceResult<Integer> getElo(long characterId) {
+        try {
+            return characterDao.getElo(characterId)
+                .map(elo -> ServiceResult.success(MessageCode.SUCCESS, elo))
+                .orElseGet(() -> {
+                    log.info("Elo lookup found no character with ID: " + characterId);
+                    return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+                });
+        } catch (Exception e) {
+            log.error("Elo lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
     public ServiceResult<Long> createCharacter(long accountId, Character character) {
         try {
             if (characterDao.getCharacterCount(accountId) >= 3) {

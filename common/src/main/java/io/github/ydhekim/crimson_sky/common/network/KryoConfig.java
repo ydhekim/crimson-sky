@@ -101,5 +101,9 @@ public class KryoConfig {
         kryo.register(ResolvedAction.class, new RecordSerializer<>(ResolvedAction.class));
         kryo.register(CombatActionRequest.class, new RecordSerializer<>(CombatActionRequest.class));
         kryo.register(CombatActionResponse.class, new RecordSerializer<>(CombatActionResponse.class));
+
+        // Matchmaking (M3/B1) — likewise appended at the end, after every existing registration.
+        kryo.register(MatchmakingRequest.class, new RecordSerializer<>(MatchmakingRequest.class));
+        kryo.register(MatchmakingFoundResponse.class, new RecordSerializer<>(MatchmakingFoundResponse.class));
     }
 }

@@ -9,12 +9,25 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.util.List;
+import java.util.Optional;
 
 @RegisterConstructorMapper(CharacterEntity.class)
 public interface CharacterDao {
 
     @SqlQuery("SELECT * FROM characters WHERE account_id = :accountId")
     List<CharacterEntity> getCharactersByAccountId(@Bind("accountId") long accountId);
+
+    /** Loads one character by id, regardless of owner — matchmaking needs both sides of a pairing. */
+    @SqlQuery("SELECT * FROM characters WHERE id = :characterId")
+    Optional<CharacterEntity> findById(@Bind("characterId") long characterId);
+
+    /**
+     * Matchmaking rating only (story B1). Deliberately narrow rather than widening the shared
+     * {@code Character} record with an {@code elo} field: only the pairing logic reads it today.
+     * Story C1 is where Elo becomes client-visible and gets written back.
+     */
+    @SqlQuery("SELECT elo FROM characters WHERE id = :characterId")
+    Optional<Integer> getElo(@Bind("characterId") long characterId);
 
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE name = :name)")
     boolean isNameTaken(@Bind("name") String name);
