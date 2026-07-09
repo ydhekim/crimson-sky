@@ -94,5 +94,12 @@ public class KryoConfig {
         kryo.register(SkillType.class);
         kryo.register(Difficulty.class);
         kryo.register(Tameness.class);
+
+        // Combat (M2) — appended at the end so existing positional IDs above are untouched
+        // (system design §5). ResolvedAction rides inside CombatActionResponse.actions().
+        kryo.register(ActionSource.class);
+        kryo.register(ResolvedAction.class, new RecordSerializer<>(ResolvedAction.class));
+        kryo.register(CombatActionRequest.class, new RecordSerializer<>(CombatActionRequest.class));
+        kryo.register(CombatActionResponse.class, new RecordSerializer<>(CombatActionResponse.class));
     }
 }

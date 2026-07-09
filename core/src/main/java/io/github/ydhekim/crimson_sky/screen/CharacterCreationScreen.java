@@ -216,8 +216,10 @@ public class CharacterCreationScreen extends BaseScreen {
             stats.get("Insight")
         );
 
+        // maxHp, maxMp, maxStamina, baseDef, baseAtk — literal starting values (see V6 migration
+        // note; stat-derived formulas from system design §4.2 are a later tuning concern).
         Character newCharacter = new Character(
-            0, 0, characterName, selectedFaction, 1, 0, 100, 100, 10, 10,
+            0, 0, characterName, selectedFaction, 1, 0, 100, 100, 100, 10, 10,
             characterStats,
             new Inventory(null, null, null),
             new Loadout(null, null, null)

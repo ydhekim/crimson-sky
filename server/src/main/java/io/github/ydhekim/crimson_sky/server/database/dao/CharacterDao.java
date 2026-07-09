@@ -19,8 +19,16 @@ public interface CharacterDao {
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE name = :name)")
     boolean isNameTaken(@Bind("name") String name);
 
-    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, base_def, base_atk, stats, inventory, loadout) " +
-        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout)")
+    /**
+     * Ownership guardrail (system design §6/B3): true only when the character with {@code id}
+     * belongs to {@code accountId}. Used to reject combat requests referencing a character the
+     * connection's account does not own, never trusting the client-supplied id beyond this check.
+     */
+    @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE id = :characterId AND account_id = :accountId)")
+    boolean isOwnedByAccount(@Bind("accountId") long accountId, @Bind("characterId") long characterId);
+
+    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, max_stamina, base_def, base_atk, stats, inventory, loadout) " +
+        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.maxStamina, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout)")
     @GetGeneratedKeys("id")
     long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 

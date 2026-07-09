@@ -6,6 +6,7 @@ import io.github.ydhekim.crimson_sky.server.database.dao.*;
 public class ServiceRegistry {
     private final UserService userService;
     private final CharacterService characterService;
+    private final CombatService combatService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -17,6 +18,7 @@ public class ServiceRegistry {
 
         CharacterDao characterDao = dbManager.getJdbi().onDemand(CharacterDao.class);
         this.characterService = new CharacterService(characterDao);
+        this.combatService = new CombatService(characterDao);
 
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
@@ -34,6 +36,10 @@ public class ServiceRegistry {
 
     public CharacterService getCharacterService() {
         return characterService;
+    }
+
+    public CombatService getCombatService() {
+        return combatService;
     }
 
     public LocalizationService getLocalizationService() {

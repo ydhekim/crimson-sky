@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.combat;
 
+import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Skill;
@@ -9,80 +10,145 @@ import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import java.util.SplittableRandom;
 
 /**
- * Pure implementation of the character-action half of the GDD §3 cascade (story A1). Kept free of
- * Ashley and any LibGDX rendering type so it is a plain function of (stats, loadout, seeded RNG) and
- * can be unit-tested headlessly (system design §9). {@link io.github.ydhekim.crimson_sky.ecs.system.ActionResolutionSystem}
- * is the thin ECS wrapper that feeds this from components.
+ * Pure implementation of the character-action half of the GDD §3 cascade (stories A1/A7). Kept free
+ * of Ashley and any LibGDX rendering type so it is a plain function of (stats, pouches, seeded RNG)
+ * and can be unit-tested headlessly (system design §9). The ECS
+ * {@link io.github.ydhekim.crimson_sky.ecs.system.ActionResolutionSystem} feeds this from components;
+ * {@link BattleEngine} uses {@link #chooseCharacterAction} directly to also apply damage.
  *
- * <h2>Cascade (GDD §3 Step 1)</h2>
+ * <h2>Cascade with priority-ordered pouches (system design §4.1/§4.3/§4.4)</h2>
  * <ol>
- *   <li><b>Weapon Draw</b> — roll vs STR. On success, draw the equipped weapon.</li>
- *   <li><b>Skill Cast</b> — if the weapon roll fails, roll vs WIS. On success, validate mana: if
- *       {@code currentMana < skill.manaCost()} the turn is <b>Burned</b>
- *       ({@code failed = true}); otherwise the skill resolves.</li>
- *   <li><b>Fallback</b> — if both rolls fail (or no weapon/skill is equipped for that branch),
- *       the action is a Punch.</li>
+ *   <li><b>Weapon branch</b> — if the weapon pouch is non-empty, one d100 gate roll vs
+ *       {@code effectiveStrength(str, pouch[0].weight)} (slot 0's weight always gates, §4.4). On
+ *       success, walk the pouch by <b>Stamina affordability only</b> ({@code remainingStamina >=
+ *       staminaCost}, no re-rolling) and use the first affordable weapon; frequency is
+ *       {@code 1 + dexterity/30} (raw DEX). If none affordable, fall through to the skill branch.</li>
+ *   <li><b>Skill branch</b> — same shape: one gate roll vs slot 0's {@code effectiveWis}, then walk
+ *       by <b>Mana affordability</b> ({@code currentMana >= manaCost}). Frequency uses the
+ *       <i>selected</i> skill's {@code effectiveWis}. If none affordable → <b>Burned</b> cast on
+ *       slot 0 ({@code failed = true}).</li>
+ *   <li><b>Punch fallback</b> — both branches failed or both pouches empty. Punch costs 0 Mana and
+ *       0 Stamina and is never blocked by a resource check (§4.2).</li>
  * </ol>
  *
- * <h2>Concrete rules (GDD leaves these open; fixed here, reflected in system design §4)</h2>
- * <ul>
- *   <li><b>Roll model:</b> {@code rng.nextInt(100) < stat} succeeds — a d100 against a 0–100 stat.
- *       RNG governs only pass/fail; frequency is deterministic.</li>
- *   <li><b>Frequency:</b> {@code 1 + stat/30} (integer division), DEX for weapons, WIS for skills.
- *       Reproduces the GDD scenarios: DEX 60 → 3, WIS 80 → 3. Punch is a single fallback strike (1).</li>
- * </ul>
+ * <p>RNG governs only the pass/fail of each single gate roll ({@code rng.nextInt(100) < stat}); the
+ * pouch walk and frequency are deterministic, so RNG consumption is one roll per attempted branch —
+ * unchanged from A1, keeping the existing determinism tests valid.
  */
 public final class ActionResolver {
-
-    /** d100 threshold: the stat is a success percentage against a roll in [0, 100). */
-    private static final int ROLL_BOUND = 100;
-
-    /** Frequency granularity: every {@value} points of the governing stat adds one repeat. */
-    private static final int FREQUENCY_STEP = 30;
 
     /** Label shown for a Burned cast (GDD Scenario 3 renders this in place of the skill). */
     public static final String FAILED_CAST_LABEL = "FAILED_CAST";
 
+    /** Punch damage range (§4.2) — the only source with no backing record. */
+    static final int PUNCH_MIN = 1;
+    static final int PUNCH_MAX = 5;
+
     private ActionResolver() {
     }
 
+    // --- Public story-level API (returns the plain ResolvedAction) ---------------------------------
+
     /**
-     * Resolves the character's action for one turn following the GDD cascade.
+     * Pouch-based resolution (A7). See the class doc for the cascade.
      *
-     * @param stats       the character's eight-stat block (STR/DEX/WIS drive this cascade)
-     * @param weapon      the equipped weapon, or {@code null} if none is equipped
-     * @param skill       the equipped skill, or {@code null} if none is equipped
-     * @param currentMana the character's current mana pool, checked against the skill's cost
-     * @param rng         the battle's seeded RNG (see {@link BattleSession#rng()})
-     * @return the resolved character action; never {@code null}
+     * @param stats            the character's eight-stat block (STR/DEX/WIS drive this cascade)
+     * @param weapons          the priority-ordered weapon pouch (index 0 = tried first); may be empty
+     * @param skills           the priority-ordered ACTIVE-skill pouch; may be empty
+     * @param currentMana      mana available now, checked per-skill against {@code manaCost()}
+     * @param remainingStamina stamina available now, checked per-weapon against {@code staminaCost()}
+     * @param rng              the battle's seeded RNG (see {@link BattleSession#rng()})
+     */
+    public static ResolvedAction resolveCharacterAction(Stats stats, Array<Weapon> weapons,
+                                                        Array<Skill> skills, int currentMana,
+                                                        int remainingStamina, SplittableRandom rng) {
+        return chooseCharacterAction(stats, weapons, skills, currentMana, remainingStamina, rng).action();
+    }
+
+    /**
+     * Back-compat single-item overload (the A1 degenerate case). Wraps the one weapon/skill into
+     * single-element pouches and treats Stamina as unlimited, so the original A1/A6 scenario tests
+     * keep the same RNG consumption and outcomes. A {@code null} weapon/skill becomes an empty pouch
+     * (that branch is skipped, no roll consumed) — identical to A1's short-circuit behavior.
      */
     public static ResolvedAction resolveCharacterAction(Stats stats, Weapon weapon, Skill skill,
                                                         int currentMana, SplittableRandom rng) {
-        // Step 1a — Weapon Draw: roll vs STR.
-        if (weapon != null && roll(rng) < stats.strength()) {
-            return new ResolvedAction(ActionSource.WEAPON, weapon.name(), frequency(stats.dexterity()), false);
+        Array<Weapon> weapons = new Array<>();
+        if (weapon != null) {
+            weapons.add(weapon);
         }
+        Array<Skill> skills = new Array<>();
+        if (skill != null) {
+            skills.add(skill);
+        }
+        return resolveCharacterAction(stats, weapons, skills, currentMana, Integer.MAX_VALUE, rng);
+    }
 
-        // Step 1b — Skill Cast: on weapon failure, roll vs WIS, then validate mana.
-        if (skill != null && roll(rng) < stats.wisdom()) {
-            if (currentMana < skill.manaCost()) {
-                // Mana validation fails → Burned (GDD Scenario 3). A burned cast is a single event.
-                return new ResolvedAction(ActionSource.SKILL, FAILED_CAST_LABEL, 1, true);
+    // --- Decision layer used by BattleEngine (carries damage inputs) -------------------------------
+
+    /**
+     * The full cascade, returning the chosen action plus the damage inputs {@link BattleEngine} needs.
+     * Package-private: only the same-package battle orchestration consumes the extra fields.
+     */
+    static CharacterActionResolution chooseCharacterAction(Stats stats, Array<Weapon> weapons,
+                                                           Array<Skill> skills, int currentMana,
+                                                           int remainingStamina, SplittableRandom rng) {
+        // Step 1 — Weapon branch: one gate roll vs slot 0's effectiveStrength.
+        if (weapons != null && weapons.size > 0
+            && roll(rng) < CombatMath.effectiveStrength(stats.strength(), weapons.get(0).weight())) {
+            Weapon chosen = firstAffordableWeapon(weapons, remainingStamina);
+            if (chosen != null) {
+                ResolvedAction action = new ResolvedAction(
+                    ActionSource.WEAPON, chosen.name(), CombatMath.frequency(stats.dexterity()), false);
+                return new CharacterActionResolution(
+                    action, chosen.minAttack(), chosen.maxAttack(), stats.strength(), chosen.staminaCost());
             }
-            return new ResolvedAction(ActionSource.SKILL, skill.name(), frequency(stats.wisdom()), false);
+            // Roll succeeded but nothing affordable → fall through exactly like an empty weapon pouch.
         }
 
-        // Step 1c — Fallback: all checks failed → Punch.
-        return new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false);
+        // Step 2 — Skill branch: one gate roll vs slot 0's effectiveWis.
+        if (skills != null && skills.size > 0
+            && roll(rng) < CombatMath.effectiveWis(stats.wisdom(), skills.get(0).difficultyToAct())) {
+            Skill chosen = firstAffordableSkill(skills, currentMana);
+            if (chosen != null) {
+                int freq = CombatMath.frequency(
+                    CombatMath.effectiveWis(stats.wisdom(), chosen.difficultyToAct()));
+                ResolvedAction action = new ResolvedAction(ActionSource.SKILL, chosen.name(), freq, false);
+                return new CharacterActionResolution(
+                    action, chosen.minAttack(), chosen.maxAttack(), stats.intelligence(), chosen.manaCost());
+            }
+            // None affordable → Burned cast on slot 0 (single event, no damage applied, nothing spent).
+            ResolvedAction burned = new ResolvedAction(ActionSource.SKILL, FAILED_CAST_LABEL, 1, true);
+            return new CharacterActionResolution(burned, 0, 0, 0, 0);
+        }
+
+        // Step 3 — Punch fallback: always available, 0 cost.
+        ResolvedAction punch = new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false);
+        return new CharacterActionResolution(punch, PUNCH_MIN, PUNCH_MAX, stats.strength(), 0);
+    }
+
+    /** First weapon in priority order the character can still afford from Stamina, or {@code null}. */
+    private static Weapon firstAffordableWeapon(Array<Weapon> weapons, int remainingStamina) {
+        for (Weapon weapon : weapons) {
+            if (CombatMath.isAffordable(weapon, remainingStamina)) {
+                return weapon;
+            }
+        }
+        return null;
+    }
+
+    /** First skill in priority order the character can currently afford from Mana, or {@code null}. */
+    private static Skill firstAffordableSkill(Array<Skill> skills, int currentMana) {
+        for (Skill skill : skills) {
+            if (CombatMath.isAffordable(skill, currentMana)) {
+                return skill;
+            }
+        }
+        return null;
     }
 
     /** A single d100 draw in [0, 100). Extracted so the roll model lives in exactly one place. */
     private static int roll(SplittableRandom rng) {
-        return rng.nextInt(ROLL_BOUND);
-    }
-
-    /** Number of action repeats derived from the governing frequency stat (DEX or WIS). */
-    private static int frequency(int frequencyStat) {
-        return 1 + frequencyStat / FREQUENCY_STEP;
+        return rng.nextInt(CombatMath.ROLL_BOUND);
     }
 }

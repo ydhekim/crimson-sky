@@ -38,11 +38,11 @@ class DeterminismTest {
     }
 
     private static Weapon sampleWeapon() {
-        return new Weapon(1L, "Hammer", "A heavy hammer", Rarity.COMMON, 5.0f, 40);
+        return new Weapon(1L, "Hammer", "A heavy hammer", Rarity.COMMON, 5.0f, 30, 40, 8);
     }
 
     private static Skill sampleSkill() {
-        return new Skill(1L, "Fireball", "A ball of fire", SkillType.ACTIVE, 20, Difficulty.MEDIUM);
+        return new Skill(1L, "Fireball", "A ball of fire", SkillType.ACTIVE, 20, Difficulty.MEDIUM, 40, 60);
     }
 
     @Test
@@ -91,7 +91,7 @@ class DeterminismTest {
         entity.add(manaComponent);
 
         WeaponSlotComponent weaponSlot = engine.createComponent(WeaponSlotComponent.class);
-        weaponSlot.equipped = sampleWeapon();
+        weaponSlot.equipped.add(sampleWeapon()); // single-item pouch = the A1 degenerate case
         entity.add(weaponSlot);
 
         engine.addEntity(entity);

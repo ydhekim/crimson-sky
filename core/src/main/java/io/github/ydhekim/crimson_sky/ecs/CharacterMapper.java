@@ -11,6 +11,7 @@ import io.github.ydhekim.crimson_sky.ecs.component.LevelComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.LoadoutComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.ManaComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.NameComponent;
+import io.github.ydhekim.crimson_sky.ecs.component.StaminaComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.StatsComponent;
 
 /**
@@ -46,6 +47,11 @@ public class CharacterMapper {
         manaCmp.maxMana = character.maxMp();
         manaCmp.currentMana = character.maxMp(); // start at max
         entity.add(manaCmp);
+
+        StaminaComponent staminaCmp = engine.createComponent(StaminaComponent.class);
+        staminaCmp.maxStamina = character.maxStamina();
+        staminaCmp.currentStamina = character.maxStamina(); // start at max
+        entity.add(staminaCmp);
 
         BaseStatsComponent baseStatsCmp = engine.createComponent(BaseStatsComponent.class);
         baseStatsCmp.baseDefence = character.baseDef();

@@ -38,12 +38,15 @@ class ActionResolverTest {
         return new Stats(str, dex, 50, intel, wis, 50, 50, ins);
     }
 
+    // New record shapes (Weapon: min/max/staminaCost; Skill: min/max). Weight stays low (5) so the
+    // weapon-draw roll reads effectiveStrength == raw STR for these fixtures, and the single-item
+    // overload treats Stamina as unlimited — so every A1 scenario/assertion below is unchanged.
     private static Weapon weapon(String name) {
-        return new Weapon(1L, name, name + " description", Rarity.COMMON, 5.0f, 40);
+        return new Weapon(1L, name, name + " description", Rarity.COMMON, 5.0f, 30, 40, 8);
     }
 
     private static Skill skill(String name, int manaCost) {
-        return new Skill(1L, name, name + " description", SkillType.ACTIVE, manaCost, Difficulty.MEDIUM);
+        return new Skill(1L, name, name + " description", SkillType.ACTIVE, manaCost, Difficulty.MEDIUM, 40, 60);
     }
 
     // --- GDD §5 scenarios ---------------------------------------------------------------------

@@ -16,6 +16,7 @@ public record CharacterEntity(
     long experience,
     int maxHp,
     int maxMp,
+    int maxStamina,
     int baseDef,
     int baseAtk,
     @Json Stats stats,
@@ -23,13 +24,13 @@ public record CharacterEntity(
     @Json Loadout loadout) {
 
     public Character toCommonModel() {
-        return new Character(id, accountId, name, faction, level, experience, maxHp, maxMp, baseDef, baseAtk, stats, inventory, loadout);
+        return new Character(id, accountId, name, faction, level, experience, maxHp, maxMp, maxStamina, baseDef, baseAtk, stats, inventory, loadout);
     }
 
     public static CharacterEntity fromCommonModel(long accountId, Character c) {
         return new CharacterEntity(
             c.id(), accountId, c.name(), c.faction(), c.level(), c.experience(),
-            c.maxHp(), c.maxMp(), c.baseDef(), c.baseAtk(),
+            c.maxHp(), c.maxMp(), c.maxStamina(), c.baseDef(), c.baseAtk(),
             c.stats(), c.inventory(), c.loadout()
         );
     }

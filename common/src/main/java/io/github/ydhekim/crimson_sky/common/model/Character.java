@@ -9,6 +9,7 @@ public record Character(
     long experience,
     int maxHp,
     int maxMp,
+    int maxStamina,
     int baseDef,
     int baseAtk,
     Stats stats,

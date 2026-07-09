@@ -1,6 +1,6 @@
 # User Stories / Backlog
 
-Last updated: 2026-07-06 (revised same day: added Epics G–J for Steam, account linking, security/ops, and future live-ops content; promoted A6; updated B2 and D1)
+Last updated: 2026-07-09 (M2 combat-core pass: A1 revisited + A2/A3/A5/A7/B2/B3 marked done — pouch/stamina resolution, pet check, Result Set compilation, `BattleSession`/`BattleEngine`, and the combat-request ownership guardrail)
 
 Priority: **P0** blocks the milestone, **P1** important but not blocking, **P2** nice-to-have / can slip.
 Size: **XS** (minutes, extends an existing pattern — see Epic K), **S** (~1 session), **M** (~2-3 sessions), **L** (multi-session, consider splitting further before starting).
@@ -12,27 +12,31 @@ Status: `todo` / `in-progress` / `done`. Update this file as part of each sprint
 
 **A1.** As the server, I resolve a character's turn action using the GDD cascade (Weapon Draw roll vs STR → Skill Cast roll vs WIS + mana check → fallback Punch), so combat outcomes follow the Mizan rules.
 Acceptance criteria: given fixed stats/loadout/RNG seed, `ActionResolutionSystem` deterministically produces the same `ResolvedAction` as hand-computed from the GDD scenarios (see GDD §5 for the three worked examples to use as test fixtures).
-Priority: P0. Size: M. Status: done. *(Core resolution cascade + `ActionResolutionSystem` implemented and unit-tested against the three GDD scenarios. Server-side invocation — a handler/service running the engine tick — is still unwired because `server` does not yet depend on `core`; that closes with §6/B3, see system design §4.)*
+Priority: P0. Size: M. Status: done. *(Revisited for the pouch model: `ActionResolver` now walks `Array<Weapon>`/`Array<Skill>` pouches (A7) with the single-item overload retained so the three GDD-scenario tests pass unchanged. The gate roll uses slot 0's `effectiveStrength`/`effectiveWis`; the effective-stat formulas were recalculated to confirm the original scenario outcomes hold under seeds 42/123456789. Server-side invocation still unwired — see B3.)*
 
 **A2.** As the server, I run an independent Insight check each turn to decide whether the pet acts, appended to the Result Set regardless of the character's own action outcome.
-Acceptance criteria: pet action frequency scales with `Tameness` + `insight` per GDD §2/§3 Step 2; pet check runs even when the character action was `Burned` (GDD Scenario 3).
-Priority: P0. Size: M. Status: todo.
+Acceptance criteria: pet action frequency scales with `Tameness` + `insight` per GDD §2/§3 Step 2; pet check runs even when the character action was `Burned` (GDD Scenario 3). Concrete `Tameness`-to-modifier mapping and the effective-insight formula are now specced in `01-system-design-combat-engine.md` §4.3 — use those numbers rather than re-deriving.
+Priority: P0. Size: M. Status: done. *(Pure `PetResolver` (Insight roll vs `effectiveInsight = insight + tamenessModifier`, frequency `1 + effectiveInsight/30`) + `PetResolutionSystem` writing `PetActionComponent`. `PouchResolutionTest.petActs_evenWhenCharacterCastIsBurned` asserts the pet fires after a Burned cast (GDD Scenario 3); `BattleEngine` also runs the pet decision every turn regardless of the character outcome.)*
 
 **A3.** As the server, I compile the character action + pet action into an ordered Result Set array matching the GDD's `[3x Hammer, 2x Wolf]` shape.
-Acceptance criteria: `ResultCompilationSystem` output serializes cleanly into `CombatActionResponse.actions()`.
-Priority: P0. Size: S. Status: todo.
+Acceptance criteria: `ResultCompilationSystem` output serializes cleanly into `CombatActionResponse.actions()`. Note: `ResolvedAction` currently has no damage field — system design §4.2 now specs the damage/mitigation/dodge formulas this story (and A5) will need a place to store; adding that field is in scope for this story or a tightly-coupled follow-up, not a separate epic.
+Priority: P0. Size: S. Status: done. *(`ResultCompilationSystem` merges `CharacterActionComponent` + `PetActionComponent` into an ordered `TurnResultComponent.actions` via the shared `ResultCompiler` (`[character, pet]`), which serializes directly into `CombatActionResponse.actions()`. `ResolvedAction` gained an `int damage` field (5th component; 4-arg convenience ctor keeps the decision layer damage-agnostic) — filled by `BattleEngine` at application time; the ECS compile step is decision-only, damage 0.)*
 
 **A4.** As a developer, each battle uses a seeded RNG so I can reproduce and unit test any outcome.
 Acceptance criteria: seed stored on `BattleSession`; same seed + same inputs → same Result Set across runs.
 Priority: P1. Size: S. Status: done. *(Minimal `BattleSession` holds the seed + a `SplittableRandom`; `DeterminismTest` proves same-seed reproducibility through both the pure resolver and the ECS system.)*
 
-**A5.** As the server, I track ephemeral Battle State (weapon depletion, spent mana, pet-used-this-turn) that resets when a battle ends and never touches the database.
-Acceptance criteria: `BattleStateComponent` exists only on entities inside an active `BattleSession`; nothing in it is written to Postgres (GDD §4).
-Priority: P0. Size: M. Status: todo.
+**A5.** As the server, I track ephemeral Battle State (spent mana, spent stamina, pet-used-this-turn) that resets when a battle ends and never touches the database.
+Acceptance criteria: `BattleStateComponent` holds `spentMana`/`spentStamina`/`petUsedThisTurn` (system design §3 — the field was originally a single `weaponDepleted` boolean; corrected to `spentStamina` once A7's multi-weapon pouch made a single boolean insufficient) and exists only on entities inside an active `BattleSession`; nothing in it is written to Postgres (GDD §4). Damage application, mitigation, dodge, turn priority, and win-condition logic (system design §4.2) will likely need their own system/story once B2 (`BattleSession` with two participants) lands — this story is scoped to the state container itself, not the resolution logic that reads/writes it.
+Priority: P0. Size: M. Status: done. *(`BattleStateComponent` (`spentMana`/`spentStamina`/`petUsedThisTurn`, no `weaponDepleted`) added, plus a `StaminaComponent` mirroring `ManaComponent` for the `maxStamina` pool. Populated only inside a battle (`BattleParticipant.fromCharacter`); `BattleEngine` mirrors each spend onto `spent*`. Nothing here is persisted — see the resource-model note in the close-out flags below.)*
 
 **A6.** As a developer, I have a `core` test source set so combat resolution logic can be unit tested headlessly.
 Acceptance criteria: `gradlew.bat core:test` runs; at least the three GDD §5 scenarios are encoded as tests, using fixed seeds against `SplittableRandom` (see system design §4/§9).
-Priority: **P0** (promoted from P1 — probability-driven logic breaks silently during refactors and is hard to catch by playtesting alone; this is cheap insurance). Size: S. Status: done. *(JUnit 5 test source set added to `core`; the three §5 scenarios (seed 42) plus punch-fallback and mana-boundary edge cases are asserted. Tests cover the character-action column only — pet actions await A2.)*
+Priority: **P0** (promoted from P1 — probability-driven logic breaks silently during refactors and is hard to catch by playtesting alone; this is cheap insurance). Size: S. Status: done. *(JUnit 5 test source set added to `core`; the three §5 scenarios (seed 42) plus punch-fallback and mana-boundary edge cases are asserted. Tests cover the character-action column only — pet actions await A2.)* Once the damage/mitigation/stamina formulas (§4.2/§4.4) get their own tests, use `docs/planning/04-starter-content.md`'s items as fixtures rather than inventing new placeholder numbers per test.
+
+**A7.** As a player, I can equip a small priority-ordered set of weapons and active skills ("pouch") rather than exactly one of each, so my loadout has real build depth.
+Acceptance criteria: `WeaponSlotComponent`/`SkillSlotComponent` hold an ordered collection instead of a single item; `ActionResolver` walks the list on a successful roll and uses the first weapon the character can afford from their **Stamina** pool (`remainingStamina >= weapon.staminaCost()`) or the first skill they can afford from **Mana** (`currentMana >= skill.manaCost()`) — both fallbacks are the same shape, see system design §4.4. Requires the data-model additions in §4.2 (`Weapon.staminaCost`, `Character.maxStamina`, `BattleStateComponent.spentStamina`) alongside the weapon min/max-range change. Existing A1/A6 tests must still pass against a single-item pouch (regression), plus new tests for multi-item mana- and stamina-driven fallback, including the "nothing affordable" case for both.
+Priority: P1. Size: M. Status: done. *(`WeaponSlotComponent`/`SkillSlotComponent` now hold `Array<Weapon>`/`Array<Skill>` (index = priority; ACTIVE-only for skills). `ActionResolver` rolls one gate on slot 0 (`effectiveStrength`/`effectiveWis`) then walks by Stamina/Mana affordability. Data-model additions landed (`Weapon.minAttack/maxAttack/staminaCost`, `Skill.minAttack/maxAttack`, `Pet.minAttack/maxAttack`, `Character.maxStamina` + V6 migration, `BattleStateComponent.spentStamina`). `PouchResolutionTest` covers stamina/mana fallthrough and "nothing affordable" for both branches with `04-starter-content.md` fixtures; A1/A6 regression tests pass unmodified in behavior.)*
 
 ---
 
@@ -44,11 +48,11 @@ Priority: P0. Size: M. Status: todo.
 
 **B2.** As the server, I create and track an authoritative `BattleSession` bridging connected clients once matched.
 Acceptance criteria: session holds participants as `Array<BattleParticipant>` (not hardcoded `characterA`/`characterB` fields — see system design §7, this leaves raids possible later without a rewrite), a `SplittableRandom` seed, and per-participant `BattleStateComponent`; cleaned up when the battle ends. Only two participants are ever populated at launch.
-Priority: P0. Size: L. Status: todo. *(Consider splitting into "create session" and "end/cleanup session" before starting.)*
+Priority: P0. Size: L. Status: done. *(`BattleSession` now holds `Array<BattleParticipant>` + `end()` cleanup; `BattleParticipant` wraps an Ashley `Entity` (state in components, incl. its `BattleStateComponent` per §7) with a `fromCharacter` battle-setup factory. `BattleEngine` fixes priority once (speed, seeded-coinflip tiebreak), resolves per-turn Result Sets with per-hit dodge/damage/win-condition, the kill-prevents-counter rule, and the turn-40 cap (HP% → SPD → coinflip). `BattleEngineTest` proves the priority-order kill prevents the counter-hit. Matchmaking-driven session creation is B1 (still todo); this delivered the session model + turn engine it will feed.)*
 
 **B3.** As the server, I validate that combat-related requests (starting with `CombatActionRequest`) reference a `characterId` owned by `connection.account`, matching the ownership-check pattern already used in `CharacterListRequestHandler`/`DeleteCharacterRequestHandler`.
 Acceptance criteria: a request referencing a character not owned by the connection's account is rejected, not silently processed.
-Priority: P0. Size: S. Status: todo.
+Priority: P0. Size: S. Status: done. *(`CombatActionRequest`/`CombatActionResponse` packets added + registered at the end of `KryoConfig` (with `ResolvedAction`/`ActionSource`). `CombatActionRequestHandler` → `CombatService.isCharacterOwnedBy` (new `CharacterDao.isOwnedByAccount`, fails closed) rejects unauthenticated connections and non-owned characters with a log + early return, matching `CharacterListRequestHandler`/`DeleteCharacterRequestHandler`. Wired through `KryoPacketRouter`/`ServiceRegistry`. Scoped to the ownership guardrail only — actually running the engine tick server-side needs B1 (matchmaking) + `server`→`core`, deliberately deferred; see close-out flags.)*
 
 ---
 
@@ -86,7 +90,7 @@ Acceptance criteria: distinct visual/audio treatment for `ResolvedAction.failed(
 Priority: P1. Size: S. Status: todo.
 
 **D4.** As a player, I can equip/change my loadout (weapons, skills, pets) before entering matchmaking.
-Acceptance criteria: new loadout-management screen reading/writing `Loadout`; the record already exists, only the UI is missing.
+Acceptance criteria: new loadout-management screen reading/writing `Loadout`; the record already exists, only the UI is missing. Screen must let the player set weapon/active-skill **priority order** within the pouch (A7/system design §4.4), and must warn when an equipped weapon's `weight` exceeds the character's `comfortableWeight` (system design §4.3) — e.g. "Too heavy for your Strength — reduced draw chance" — so the tradeoff is visible before the fight, not discovered mid-battle. Server-side save handler must validate every item in the submitted `Loadout` actually exists in the account's `Inventory` before persisting (system design §4.4) — same ownership-guardrail pattern as character/battle IDs, applied to items.
 Priority: P0. Size: M. Status: todo.
 
 ---
@@ -94,9 +98,11 @@ Priority: P0. Size: M. Status: todo.
 ## Epic E — Content & Data — M5
 
 **E1.** As a designer, weapons/skills/pets are data-driven (DB rows or JSON, not hardcoded Java) so balance can be tuned without a redeploy.
+Acceptance criteria: `docs/planning/04-starter-content.md` is a seed for this, not a replacement — it exists to unblock A6/A7/E2 test fixtures before this story lands, expect to expand well past its 3 weapons/4 skills/4 pets.
 Priority: P1. Size: M. Status: todo.
 
 **E2.** As a player, there's more than one viable build (at least one Physical-path and one Magical-path test character) to validate the symmetric stat design actually feels balanced.
+Acceptance criteria: use `docs/planning/04-starter-content.md`'s Longsword-vs-Lightning-Bolt pairing (calibrated against the same compensation heuristic as system design §4.3) as the starting point for this validation, extended with a Monte Carlo pass per §4.2's recommendation rather than manual playtesting alone.
 Priority: P1. Size: M. Status: todo.
 
 ---
@@ -188,6 +194,27 @@ Priority: unscoped. Status: idea.
 Priority: unscoped. Status: idea.
 
 **J3.** Raids — N-participant PvE content. `BattleSession`'s participant-array design (see B2, system design §7) was chosen specifically so this doesn't require a rewrite of the battle model when it's picked up.
+Priority: unscoped. Status: idea.
+
+**J4.** Faction-gated skills (Crimson = crit chance, Skyborn = dodge chance). See `docs/planning/03-lore-and-worldbuilding.md` §6 and system design §14 for the full context — a lore-driven mechanic idea, not yet numerically specced (blocked on the combat-detail pass defining crit/damage formulas first).
+Priority: unscoped. Status: idea.
+
+**J5.** Embers as an actual match resource (vs. pure lore flavor for why the Arena/Ember-gathering exists). See lore doc §6. Not decided either way yet.
+Priority: unscoped. Status: idea.
+
+**J6.** Faction selection UX — how/when a player picks Crimson Accord vs. Skyborn, and whether it's cosmetic-only or gameplay-binding. Depends on J4 being picked up first. See lore doc §6.
+Priority: unscoped. Status: idea.
+
+**J7.** Loadout slot capacity as a progression/monetization lever — start with a medium pouch size (per A7/system design §4.4) and let players unlock additional weapon/skill/passive slots via purchase or achievement rewards. No schema change needed (`Loadout`/`Inventory` are unbounded `Array<T>`); this is a server-side validation rule keyed off an account-level unlock count, whenever it's picked up.
+Priority: unscoped. Status: idea.
+
+**J8.** ~~Weapon durability~~ — superseded by Stamina, which is now in scope for A7 (system design §4.2/§4.4) rather than deferred: a shared Stamina pool with a per-weapon `staminaCost` produces the same "this weapon becomes unusable, pouch rotates" outcome as durability would, reusing the existing mana pattern instead of adding new per-item state. Left here only as a record of the earlier idea and why it was resolved differently.
+Priority: n/a. Status: superseded by A7.
+
+**J9.** "Break" skill — an active skill that disables a specific opponent weapon (their currently top-priority-and-affordable one) for the rest of the battle. Counterplay layered on top of Stamina-driven rotation (system design §4.4), not a replacement for it. Needs a per-weapon "disabled this battle" check alongside the Stamina-affordability check once picked up — straightforward `Skill` content once A7 lands, not a core-engine change.
+Priority: unscoped. Status: idea.
+
+**J10.** "Steal" skill — an active skill that lets the caster temporarily use a specific opponent weapon for the remainder of the battle only (no permanent effect). Same relationship to Stamina/A7 as J9 — additive counterplay, not foundational. Needs two-sided battle-state bookkeeping (defender loses access, attacker gains temporary access), a bit more involved than J9's one-directional disable.
 Priority: unscoped. Status: idea.
 
 ---
