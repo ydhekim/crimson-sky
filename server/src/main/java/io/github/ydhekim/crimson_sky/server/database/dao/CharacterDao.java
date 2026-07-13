@@ -59,6 +59,16 @@ public interface CharacterDao {
     @GetGeneratedKeys("id")
     long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 
+    /**
+     * Applies one battle's Exp and Elo payout (story C1). An atomic increment, not a read-then-write:
+     * the new totals are computed by the database, so two concurrent battles for the same character
+     * can't overwrite each other's reward. {@code eloDelta} is negative on a loss (system design §8.1).
+     */
+    @SqlUpdate("UPDATE characters SET experience = experience + :expDelta, elo = elo + :eloDelta WHERE id = :characterId")
+    void addExperienceAndElo(@Bind("characterId") long characterId,
+                             @Bind("expDelta") long expDelta,
+                             @Bind("eloDelta") int eloDelta);
+
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);
 
