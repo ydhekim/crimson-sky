@@ -17,11 +17,20 @@ import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
  *
  * <p>{@code battleId} is a per-battle correlation id for logs/telemetry; it addresses nothing the
  * client can look up, since no battle outlives the request that created it.
+ *
+ * <p>The three deltas (story C1) are what this battle actually paid the attacker — already applied and
+ * committed server-side by the time this packet is sent, so they are a report, not a promise the client
+ * has to redeem. They reveal nothing about the opponent's nature: a bot fight's Elo delta is computed
+ * against the attacker's own rating (system design §8.1), which is exactly what an even real matchup
+ * produces. {@code eloDelta} is negative on a loss.
  */
 public record AttackResponse(
     long battleId,
     String opponentDisplayName,
     boolean won,
-    Array<Array<ResolvedAction>> turns
+    Array<Array<ResolvedAction>> turns,
+    int goldDelta,
+    long expDelta,
+    int eloDelta
 ) {
 }

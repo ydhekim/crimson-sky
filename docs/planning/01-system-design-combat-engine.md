@@ -240,6 +240,30 @@ Note `global_currency` (the "gold" wallet) already lives on `accounts`, not `cha
 
 Explicit GDD rule to preserve in `CharacterService`/inventory logic: items "lost" in battle via skills are **not** removed from the permanent inventory — only `battle_history` and the character's persisted gold/exp/Elo change. `BattleStateComponent` (in-memory, per §3) is what's discarded at battle end; nothing about item loss should touch the DB.
 
+### 8.1 Reward formulas (Elo/Gold/Exp) — decided 2026-07-10
+
+**Scope, deliberately narrow:** C1 accumulates raw `accounts.global_currency`/`characters.experience`/`characters.elo` numbers only. There is **no leveling mechanic** in this codebase today — `Character.level`/`experience` are written once at character creation (`CharacterDao`'s insert) and never read back for a level-up threshold or stat-growth consequence anywhere. Crediting Exp is safe (it's just accumulating a number) but "what leveling up does" is an entirely separate, unscoped future epic — do not invent a level curve as a side effect of C1. Same reasoning applies to Gold: `accounts.global_currency` has no spending sink yet (no shop/store exists in the built meta layer) either — rewarding now and giving it a sink later is normal sequencing, not a gap to fix here.
+
+**Elo** — standard rating formula, chosen because it's a well-established default, not a bespoke invention:
+```
+expectedScore = 1 / (1 + 10^((opponentElo - myElo) / 400))
+actualScore = won ? 1 : 0
+eloDelta = round(K * (actualScore - expectedScore)), K = 32
+```
+For a bot opponent, treat `opponentElo` as equal to the attacker's own Elo — `BotFactory` already calibrates the bot's stat budget to the attacker's Elo, so this is consistent with that design, gives `expectedScore ≈ 0.5` (a fair coinflip-calibrated adjustment), and needs no separate bot-Elo tracking. This formula naturally produces a negative `eloDelta` on a loss — no special-casing needed for the "loss" branch.
+
+**Gold and Exp** — first pass, explicitly tunable like every other number in this doc (needs a real playtesting/economy pass once there's a Gold sink and a leveling system to validate against):
+```
+On a win:
+  goldDelta = 25 + max(0, round((opponentElo - myElo) * 0.1))
+  expDelta  = 50 + max(0, round((opponentElo - myElo) * 0.2))
+
+On a loss (small consolation, decided 2026-07-10 — keeps losing streaks from feeling like dead time):
+  goldDelta = 5
+  expDelta  = 10
+```
+The win-side bonus term rewards beating a higher-rated opponent more; it's naturally zero against a bot (bot Elo == attacker's own Elo per above), so bot fights pay exactly the flat base with no bonus — consistent with §7's "count fully, same as real" decision without giving bots either an advantage or a penalty.
+
 ## 9. Testability
 
 Because Steps 1–3 are pure functions of (stats, loadout, seeded RNG), `ActionResolutionSystem`/`PetResolutionSystem`/`ResultCompilationSystem` should be unit-testable headlessly (no LibGDX rendering dependency, consistent with the existing "headless-friendly" ECS guideline). This is the first place unit tests make sense in this repo — recommend adding a `core` test source set as part of the M2 stories rather than deferring further. Given how easily probability logic breaks silently during a refactor, story A6 (unit tests using the GDD's three worked scenarios as fixed-seed fixtures) is treated as **P0**, not a nice-to-have — see `docs/planning/00-project-plan.md` §7.

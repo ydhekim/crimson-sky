@@ -97,6 +97,16 @@ public class FakeCharacterDao implements CharacterDao {
         throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");
     }
 
+    /**
+     * Throwing here is the point: a reward's writes must go through DAOs attached to {@code
+     * RewardService}'s own transaction handle, never through the {@code onDemand} proxy a service holds.
+     * If this ever fires, a reward has escaped its transaction.
+     */
+    @Override
+    public void addExperienceAndElo(long characterId, long expDelta, int eloDelta) {
+        throw new UnsupportedOperationException("rewards are written through the transaction's own DAO handle");
+    }
+
     @Override
     public long createCharacter(CharacterEntity characterEntity) {
         throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");

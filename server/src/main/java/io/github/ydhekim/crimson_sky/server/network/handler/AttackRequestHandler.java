@@ -3,9 +3,11 @@ package io.github.ydhekim.crimson_sky.server.network.handler;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
+import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
 import io.github.ydhekim.crimson_sky.server.network.GameConnection;
 import io.github.ydhekim.crimson_sky.server.network.RequestHandler;
 import io.github.ydhekim.crimson_sky.server.service.AttackService;
+import io.github.ydhekim.crimson_sky.server.service.RewardService;
 
 import java.util.Optional;
 
@@ -18,18 +20,24 @@ import java.util.Optional;
  * gone with the packet that made it necessary — {@link AttackRequest} carries no battle or opponent id
  * for a client to misuse, since the server picks the opponent itself.
  *
- * <p>{@link AttackResult#toResponse()} is what reaches the client: the internal result's
+ * <p>{@link AttackResult#toResponse(RewardOutcome)} is what reaches the client: the internal result's
  * {@code opponentIsBot} flag and the opponent's real character id are dropped there and never
  * serialized (§7).
+ *
+ * <p>Rewards are applied between resolving the battle and answering (story C1), so the response reports
+ * a payout that is already committed. A failed reward transaction pays nothing but still sends the
+ * battle — see {@link RewardService#applyRewards(AttackResult)}.
  */
 public class AttackRequestHandler implements RequestHandler<AttackRequest> {
 
     private static final Logger log = new Logger("AttackRequestHandler", Logger.DEBUG);
 
     private final AttackService attackService;
+    private final RewardService rewardService;
 
-    public AttackRequestHandler(AttackService attackService) {
+    public AttackRequestHandler(AttackService attackService, RewardService rewardService) {
         this.attackService = attackService;
+        this.rewardService = rewardService;
     }
 
     @Override
@@ -53,8 +61,10 @@ public class AttackRequestHandler implements RequestHandler<AttackRequest> {
             return;
         }
 
+        RewardOutcome outcome = rewardService.applyRewards(result.get());
+
         log.info("Resolved battle " + result.get().battleId() + " for character " + request.characterId()
             + " (Connection ID: " + connection.getID() + ")");
-        connection.sendTCP(result.get().toResponse());
+        connection.sendTCP(result.get().toResponse(outcome));
     }
 }

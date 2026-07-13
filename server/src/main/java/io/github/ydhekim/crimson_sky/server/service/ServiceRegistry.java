@@ -8,6 +8,7 @@ public class ServiceRegistry {
     private final UserService userService;
     private final CharacterService characterService;
     private final AttackService attackService;
+    private final RewardService rewardService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -20,6 +21,11 @@ public class ServiceRegistry {
         CharacterDao characterDao = dbManager.getJdbi().onDemand(CharacterDao.class);
         this.characterService = new CharacterService(characterDao);
         this.attackService = new AttackService(characterService, new BotFactory());
+
+        // The odd one out: it takes the Jdbi itself, not an onDemand DAO. A reward spans `characters`,
+        // `accounts` and `battle_history`, and onDemand proxies open a connection per call — so the only
+        // way to get one transaction across all three is to attach the DAOs to a handle it owns.
+        this.rewardService = new RewardService(dbManager.getJdbi(), characterService);
 
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
@@ -41,6 +47,10 @@ public class ServiceRegistry {
 
     public AttackService getAttackService() {
         return attackService;
+    }
+
+    public RewardService getRewardService() {
+        return rewardService;
     }
 
     public LocalizationService getLocalizationService() {

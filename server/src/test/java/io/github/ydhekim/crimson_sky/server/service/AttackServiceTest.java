@@ -5,6 +5,7 @@ import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
+import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
 import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
@@ -129,7 +130,7 @@ class AttackServiceTest {
         AttackResult result = attack();
 
         assertTrue(result.won(), "the attacker one-shots a 1 HP opponent");
-        assertTrue(result.toResponse().won());
+        assertTrue(result.toResponse(RewardOutcome.none()).won());
     }
 
     @Test
@@ -142,14 +143,17 @@ class AttackServiceTest {
         AttackResult botFight = attack();
         assertTrue(botFight.opponentIsBot(), "precondition: this fight was against a bot");
 
-        AttackResponse response = botFight.toResponse();
+        AttackResponse response = botFight.toResponse(RewardOutcome.none());
 
         // The internal result knows; the packet's wire format has nowhere to put it. Assert on the
-        // record's shape, so adding an opponent id or bot flag later fails this test loudly.
+        // record's shape, so adding an opponent id or bot flag later fails this test loudly. The three
+        // reward deltas (story C1) are safe to carry: a bot fight's Elo delta is computed against the
+        // attacker's own rating (§8.1), which is indistinguishable from an evenly matched real fight.
         List<String> wireFields = Arrays.stream(AttackResponse.class.getRecordComponents())
             .map(RecordComponent::getName)
             .toList();
-        assertEquals(List.of("battleId", "opponentDisplayName", "won", "turns"), wireFields,
+        assertEquals(List.of("battleId", "opponentDisplayName", "won", "turns",
+                "goldDelta", "expDelta", "eloDelta"), wireFields,
             "AttackResponse must expose no opponent id and no bot flag (system design §7)");
         assertNotNull(response.opponentDisplayName());
     }
