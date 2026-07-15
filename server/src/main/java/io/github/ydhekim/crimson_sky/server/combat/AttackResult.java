@@ -36,6 +36,8 @@ public record AttackResult(
      */
     public AttackResponse toResponse(RewardOutcome outcome) {
         return new AttackResponse(battleId, opponentDisplayName, won, turns,
-            outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta());
+            outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta(),
+            outcome.skillPointsGained(), outcome.levelsGained(), outcome.statPointsGained(),
+            outcome.bonusRewardGranted());
     }
 }

@@ -146,14 +146,17 @@ class AttackServiceTest {
         AttackResponse response = botFight.toResponse(RewardOutcome.none());
 
         // The internal result knows; the packet's wire format has nowhere to put it. Assert on the
-        // record's shape, so adding an opponent id or bot flag later fails this test loudly. The three
-        // reward deltas (story C1) are safe to carry: a bot fight's Elo delta is computed against the
-        // attacker's own rating (§8.1), which is indistinguishable from an evenly matched real fight.
+        // record's shape, so adding an opponent id or bot flag later fails this test loudly. The reward
+        // deltas (story C1) and the progression fields (Epic L) are safe to carry: a bot fight's Elo
+        // delta — and its stat/skill/level payout — are computed against the attacker's own rating
+        // (§8.1/§15), indistinguishable from an evenly matched real fight. The bonus-reward field names
+        // only a granted item, never the opponent.
         List<String> wireFields = Arrays.stream(AttackResponse.class.getRecordComponents())
             .map(RecordComponent::getName)
             .toList();
         assertEquals(List.of("battleId", "opponentDisplayName", "won", "turns",
-                "goldDelta", "expDelta", "eloDelta"), wireFields,
+                "goldDelta", "expDelta", "eloDelta",
+                "skillPointsGained", "levelsGained", "statPointsGained", "bonusRewardGranted"), wireFields,
             "AttackResponse must expose no opponent id and no bot flag (system design §7)");
         assertNotNull(response.opponentDisplayName());
     }

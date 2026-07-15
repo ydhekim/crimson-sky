@@ -1,6 +1,9 @@
 package io.github.ydhekim.crimson_sky.server.database.dao;
 
+import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
+import org.jdbi.v3.json.Json;
 import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.customizer.BindMethods;
@@ -60,14 +63,64 @@ public interface CharacterDao {
     long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 
     /**
-     * Applies one battle's Exp and Elo payout (story C1). An atomic increment, not a read-then-write:
-     * the new totals are computed by the database, so two concurrent battles for the same character
-     * can't overwrite each other's reward. {@code eloDelta} is negative on a loss (system design §8.1).
+     * Applies one battle's full progress in a single statement (story C1 + Epic L / system design §8.1,
+     * §15). Exp, Elo, and the two progression currencies are atomic increments — the new totals are
+     * computed by the database, so two concurrent battles for the same character can't overwrite each
+     * other's reward. {@code eloDelta} is negative on a loss (system design §8.1).
+     *
+     * <p>{@code newLevel} is the <b>absolute</b> resulting level ({@code currentLevel + levelsGained}),
+     * not a delta: unlike the other columns, {@code level} is derived from cumulative experience by the
+     * caller's level-up loop, not additively accumulated in SQL.
      */
-    @SqlUpdate("UPDATE characters SET experience = experience + :expDelta, elo = elo + :eloDelta WHERE id = :characterId")
-    void addExperienceAndElo(@Bind("characterId") long characterId,
+    @SqlUpdate("UPDATE characters SET experience = experience + :expDelta, elo = elo + :eloDelta, "
+        + "level = :newLevel, unspent_stat_points = unspent_stat_points + :statPointsGained, "
+        + "skill_points = skill_points + :skillPointsGained WHERE id = :characterId")
+    void applyBattleProgress(@Bind("characterId") long characterId,
                              @Bind("expDelta") long expDelta,
-                             @Bind("eloDelta") int eloDelta);
+                             @Bind("eloDelta") int eloDelta,
+                             @Bind("newLevel") int newLevel,
+                             @Bind("statPointsGained") int statPointsGained,
+                             @Bind("skillPointsGained") int skillPointsGained);
+
+    /**
+     * The unspent stat-point balance for a character (Epic L / system design §15). Narrow read, in the
+     * style of {@link #getElo}: only the stat-point spend path needs it, so it stays off the shared
+     * {@code Character} record. Used to compute a friendly over-budget error and the remaining balance;
+     * the authoritative guard against overspending is {@link #spendStatPoints}'s own {@code WHERE} clause.
+     */
+    @SqlQuery("SELECT unspent_stat_points FROM characters WHERE id = :characterId")
+    Optional<Integer> getUnspentStatPoints(@Bind("characterId") long characterId);
+
+    /**
+     * Atomically spends stat points (Epic L / system design §15): writes the merged {@code stats} and
+     * decrements the balance in one guarded statement. The {@code AND unspent_stat_points >= :spent}
+     * clause is the real overspend guard — it makes the decrement fail rather than drive the balance
+     * negative if the caller's read of the balance lost a race. Returns rows affected: {@code 1} on
+     * success, {@code 0} when the guard rejected the spend.
+     */
+    @SqlUpdate("UPDATE characters SET stats = :stats, unspent_stat_points = unspent_stat_points - :spent "
+        + "WHERE id = :characterId AND unspent_stat_points >= :spent")
+    int spendStatPoints(@Bind("characterId") long characterId, @Bind("stats") @Json Stats stats, @Bind("spent") int spent);
+
+    /**
+     * Reads a character's inventory under a row lock (Epic L / system design §15, §17), for the bonus
+     * item-grant's read-modify-write. {@code FOR UPDATE} holds the row for the rest of the enclosing
+     * transaction so the write-back can't race a concurrent inventory change — the deliberately simple
+     * durability approach §17 settled on, first built here. {@code @Json} lets Jackson (de)serialize the
+     * embedded arrays; never hand-roll the JSON.
+     */
+    @SqlQuery("SELECT inventory FROM characters WHERE id = :characterId FOR UPDATE")
+    @Json
+    Optional<Inventory> getInventoryForUpdate(@Bind("characterId") long characterId);
+
+    /**
+     * Writes a character's whole inventory column back (Epic L / system design §15). The <b>only</b>
+     * {@code UPDATE} on {@code characters} permitted to touch {@code inventory} — a deliberate, named
+     * exception carved into {@code BattleLeavesInventoryAloneTest} (story C2), which continues to reject
+     * any other update reaching the stored items.
+     */
+    @SqlUpdate("UPDATE characters SET inventory = :inventory WHERE id = :characterId")
+    void updateInventory(@Bind("characterId") long characterId, @Bind("inventory") @Json Inventory inventory);
 
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);

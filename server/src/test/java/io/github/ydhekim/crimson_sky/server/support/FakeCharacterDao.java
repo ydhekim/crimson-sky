@@ -1,6 +1,8 @@
 package io.github.ydhekim.crimson_sky.server.support;
 
 import io.github.ydhekim.crimson_sky.common.model.Character;
+import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
 
@@ -17,15 +19,20 @@ import java.util.Optional;
  */
 public class FakeCharacterDao implements CharacterDao {
 
-    private record Row(Character character, long accountId, int elo) {
+    private record Row(Character character, long accountId, int elo, int unspentStatPoints) {
     }
 
     private final Map<Long, Row> rows = new LinkedHashMap<>();
     private boolean leakRequesterIntoCandidates;
 
-    /** Registers {@code character} as owned by {@code accountId}, rated at {@code elo}. */
+    /** Registers {@code character} as owned by {@code accountId}, rated at {@code elo}, with no stat points. */
     public FakeCharacterDao with(Character character, long accountId, int elo) {
-        rows.put(character.id(), new Row(character, accountId, elo));
+        return with(character, accountId, elo, 0);
+    }
+
+    /** As {@link #with(Character, long, int)}, but seeding an unspent-stat-point balance (Epic L tests). */
+    public FakeCharacterDao with(Character character, long accountId, int elo, int unspentStatPoints) {
+        rows.put(character.id(), new Row(character, accountId, elo, unspentStatPoints));
         return this;
     }
 
@@ -103,8 +110,44 @@ public class FakeCharacterDao implements CharacterDao {
      * If this ever fires, a reward has escaped its transaction.
      */
     @Override
-    public void addExperienceAndElo(long characterId, long expDelta, int eloDelta) {
+    public void applyBattleProgress(long characterId, long expDelta, int eloDelta, int newLevel,
+                                    int statPointsGained, int skillPointsGained) {
         throw new UnsupportedOperationException("rewards are written through the transaction's own DAO handle");
+    }
+
+    /** The bonus item-grant path is transactional too — it must never reach the fake's read models. */
+    @Override
+    public Optional<Inventory> getInventoryForUpdate(long characterId) {
+        throw new UnsupportedOperationException("inventory grants are written through the transaction's own DAO handle");
+    }
+
+    @Override
+    public void updateInventory(long characterId, Inventory inventory) {
+        throw new UnsupportedOperationException("inventory grants are written through the transaction's own DAO handle");
+    }
+
+    @Override
+    public Optional<Integer> getUnspentStatPoints(long characterId) {
+        Row row = rows.get(characterId);
+        return Optional.ofNullable(row).map(Row::unspentStatPoints);
+    }
+
+    /**
+     * Mirrors the real guarded write (Epic L): fails (0 rows) when the balance can't cover {@code spent},
+     * otherwise replaces the stored stats and decrements the balance so a follow-up read reflects it.
+     */
+    @Override
+    public int spendStatPoints(long characterId, Stats stats, int spent) {
+        Row row = rows.get(characterId);
+        if (row == null || row.unspentStatPoints() < spent) {
+            return 0;
+        }
+        Character c = row.character();
+        Character updated = new Character(c.id(), c.accountId(), c.name(), c.faction(), c.level(),
+            c.experience(), c.maxHp(), c.maxMp(), c.maxStamina(), c.baseDef(), c.baseAtk(),
+            stats, c.inventory(), c.loadout());
+        rows.put(characterId, new Row(updated, row.accountId(), row.elo(), row.unspentStatPoints() - spent));
+        return 1;
     }
 
     @Override

@@ -75,11 +75,16 @@ class RewardServiceTest {
 
         RewardOutcome outcome = rewardService.applyRewards(realFight(true));
 
-        // expectedScore 0.5 → eloDelta = round(32 * 0.5) = 16; no Elo gap, so no bonus on top of the base.
-        assertEquals(new RewardOutcome(25, 50L, 16), outcome);
+        // expectedScore 0.5 → eloDelta = round(32 * 0.5) = 16; no Elo gap, so no gold/exp bonus. The 50
+        // exp still carries a level-1 character across the 24-exp level-2 threshold (§15's corrected
+        // curve), so this win is also a single level-up: +3 stat points, +3 skill points (a win).
+        assertEquals(new RewardOutcome(25, 50L, 16, 3, 1, 3, null), outcome);
         assertEquals(STARTING_GOLD + 25, db.goldOf(ACCOUNT_A), "gold lands on the account, not the character");
         assertEquals(50L, db.experienceOf(ATTACKER));
         assertEquals(1016, db.eloOf(ATTACKER));
+        assertEquals(2, db.levelOf(ATTACKER), "50 exp crosses the level-2 threshold of 24");
+        assertEquals(3, db.unspentStatPointsOf(ATTACKER), "3 stat points per level gained");
+        assertEquals(3, db.skillPointsOf(ATTACKER), "a win pays 3 skill points");
     }
 
     @Test
@@ -89,12 +94,16 @@ class RewardServiceTest {
 
         RewardOutcome outcome = rewardService.applyRewards(realFight(true));
 
-        // expectedScore ≈ 0.24 → eloDelta = round(32 * 0.76) = 24; gold/exp take the Elo-gap bonus.
-        assertEquals(new RewardOutcome(45, 90L, 24), outcome);
+        // expectedScore ≈ 0.24 → eloDelta = round(32 * 0.76) = 24; gold/exp take the Elo-gap bonus. The
+        // 90-exp payout crosses TWO thresholds in one battle (24 → level 2, 64 → level 3), exercising the
+        // multi-level loop: levelsGained 2, 6 stat points. Neither level 2 nor 3 is a milestone, so no bonus.
+        assertEquals(new RewardOutcome(45, 90L, 24, 3, 2, 6, null), outcome);
         assertTrue(outcome.eloDelta() > 16, "an upset moves the rating further than an even win");
         assertTrue(outcome.goldDelta() > 25 && outcome.expDelta() > 50L,
             "beating a higher-rated opponent pays a bonus on top of the base");
         assertEquals(1024, db.eloOf(ATTACKER));
+        assertEquals(3, db.levelOf(ATTACKER), "90 exp crosses both the level-2 (24) and level-3 (64) thresholds");
+        assertEquals(6, db.unspentStatPointsOf(ATTACKER), "two levels gained → 6 stat points");
     }
 
     @Test
@@ -117,10 +126,14 @@ class RewardServiceTest {
 
         RewardOutcome outcome = rewardService.applyRewards(realFight(false));
 
-        assertEquals(new RewardOutcome(5, 10L, -16), outcome);
+        // 10 exp stays under the 24-exp level-2 threshold, so no level-up; a loss still pays 1 skill point.
+        assertEquals(new RewardOutcome(5, 10L, -16, 1, 0, 0, null), outcome);
         assertEquals(STARTING_GOLD + 5, db.goldOf(ACCOUNT_A), "a losing streak still pays something");
         assertEquals(10L, db.experienceOf(ATTACKER));
         assertEquals(984, db.eloOf(ATTACKER), "the standard Elo formula produces the loss itself");
+        assertEquals(1, db.levelOf(ATTACKER), "10 exp does not reach the level-2 threshold");
+        assertEquals(0, db.unspentStatPointsOf(ATTACKER), "no level gained, no stat points");
+        assertEquals(1, db.skillPointsOf(ATTACKER), "a loss still pays 1 skill point");
     }
 
     @Test
@@ -130,8 +143,9 @@ class RewardServiceTest {
         RewardOutcome win = rewardService.applyRewards(botFight(true));
 
         // Bot Elo == the attacker's own (system design §8.1) → expectedScore 0.5, exactly what an evenly
-        // matched real fight pays. Nothing about the payout betrays that the opponent was synthesized.
-        assertEquals(new RewardOutcome(25, 50L, 16), win);
+        // matched real fight pays. Nothing about the payout betrays that the opponent was synthesized —
+        // including the identical single level-up (50 exp over the 24 threshold) and skill-point payout.
+        assertEquals(new RewardOutcome(25, 50L, 16, 3, 1, 3, null), win);
         assertEquals(1416, db.eloOf(ATTACKER));
     }
 
@@ -139,7 +153,7 @@ class RewardServiceTest {
     void aLostBotFightCostsTheSameRatingAnEvenRealLossWould() {
         seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1400);
 
-        assertEquals(new RewardOutcome(5, 10L, -16), rewardService.applyRewards(botFight(false)));
+        assertEquals(new RewardOutcome(5, 10L, -16, 1, 0, 0, null), rewardService.applyRewards(botFight(false)));
     }
 
     @Test
