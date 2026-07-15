@@ -1,7 +1,13 @@
 package io.github.ydhekim.crimson_sky.server.support;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
+import org.jdbi.v3.jackson2.Jackson2Config;
+import org.jdbi.v3.jackson2.Jackson2Plugin;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
 import java.util.Optional;
@@ -35,7 +41,16 @@ public final class TestDatabase {
     public static TestDatabase create() {
         Jdbi jdbi = Jdbi.create("jdbc:h2:mem:crimsonsky_" + NEXT_DB.incrementAndGet()
             + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE")
-            .installPlugin(new SqlObjectPlugin());
+            .installPlugin(new SqlObjectPlugin())
+            .installPlugin(new Jackson2Plugin());
+
+        // Match production's mapper closely enough for the @Json inventory read-modify-write (Epic L's
+        // bonus grant): ParameterNamesModule lets Jackson build the Inventory/Weapon records via their
+        // canonical constructors, exactly as DatabaseManager configures it against Postgres.
+        jdbi.getConfig(Jackson2Config.class).setMapper(new ObjectMapper()
+            .registerModule(new Jdk8Module())
+            .registerModule(new ParameterNamesModule())
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false));
 
         jdbi.useHandle(handle -> {
             handle.execute("CREATE TABLE accounts ("
@@ -45,8 +60,12 @@ public final class TestDatabase {
                 + "id INTEGER PRIMARY KEY, "
                 + "account_id INTEGER NOT NULL REFERENCES accounts (id), "
                 + "name VARCHAR(50) NOT NULL, "
+                + "level INTEGER NOT NULL DEFAULT 1, "
                 + "experience BIGINT NOT NULL DEFAULT 0, "
                 + "elo INTEGER NOT NULL DEFAULT 1000, "
+                + "unspent_stat_points INTEGER NOT NULL DEFAULT 0, "
+                + "skill_points INTEGER NOT NULL DEFAULT 0, "
+                + "stats VARCHAR(2000), "
                 + "inventory VARCHAR(2000) NOT NULL, "
                 + "loadout VARCHAR(2000) NOT NULL)");
             handle.execute("CREATE TABLE battle_history ("
@@ -75,15 +94,21 @@ public final class TestDatabase {
     }
 
     /**
-     * Registers a character row. {@code inventoryJson}/{@code loadoutJson} are stored verbatim so a test
-     * can compare the stored text before and after a battle, byte for byte.
+     * Registers a character row at level 1. {@code inventoryJson}/{@code loadoutJson} are stored verbatim
+     * so a test can compare the stored text before and after a battle, byte for byte.
      */
     public TestDatabase withCharacter(long characterId, long accountId, String name, long experience,
                                       int elo, String inventoryJson, String loadoutJson) {
+        return withCharacter(characterId, accountId, name, 1, experience, elo, inventoryJson, loadoutJson);
+    }
+
+    /** As above, but seeding an explicit starting {@code level} (Epic L tests that begin near a milestone). */
+    public TestDatabase withCharacter(long characterId, long accountId, String name, int level, long experience,
+                                      int elo, String inventoryJson, String loadoutJson) {
         jdbi.useHandle(handle -> handle.execute(
-            "INSERT INTO characters (id, account_id, name, experience, elo, inventory, loadout) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?)",
-            characterId, accountId, name, experience, elo, inventoryJson, loadoutJson));
+            "INSERT INTO characters (id, account_id, name, level, experience, elo, inventory, loadout) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            characterId, accountId, name, level, experience, elo, inventoryJson, loadoutJson));
         return this;
     }
 
@@ -97,6 +122,18 @@ public final class TestDatabase {
 
     public int eloOf(long characterId) {
         return queryOne("SELECT elo FROM characters WHERE id = ?", Integer.class, characterId);
+    }
+
+    public int levelOf(long characterId) {
+        return queryOne("SELECT level FROM characters WHERE id = ?", Integer.class, characterId);
+    }
+
+    public int unspentStatPointsOf(long characterId) {
+        return queryOne("SELECT unspent_stat_points FROM characters WHERE id = ?", Integer.class, characterId);
+    }
+
+    public int skillPointsOf(long characterId) {
+        return queryOne("SELECT skill_points FROM characters WHERE id = ?", Integer.class, characterId);
     }
 
     public String inventoryJsonOf(long characterId) {

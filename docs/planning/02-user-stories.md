@@ -225,13 +225,13 @@ Priority: unscoped. Status: idea.
 **J3.** Raids — N-participant PvE content. `BattleSession`'s participant-array design (see B2, system design §7) was chosen specifically so this doesn't require a rewrite of the battle model when it's picked up.
 Priority: unscoped. Status: idea.
 
-**J4.** Faction-gated skills (Crimson = crit chance, Skyborn = dodge chance). See `docs/planning/03-lore-and-worldbuilding.md` §6 and system design §14 for the full context — a lore-driven mechanic idea, not yet numerically specced (blocked on the combat-detail pass defining crit/damage formulas first).
-Priority: unscoped. Status: idea.
+**J4.** ~~Faction-gated skills~~ — **resolved 2026-07-15, see Epic M / system design §16.** Built as the Faction branch of the skill tree rather than a standalone mechanic.
+Priority: n/a. Status: resolved by Epic M.
 
 **J5.** Embers as an actual match resource (vs. pure lore flavor for why the Arena/Ember-gathering exists). See lore doc §6. Not decided either way yet.
 Priority: unscoped. Status: idea.
 
-**J6.** Faction selection UX — how/when a player picks Crimson Accord vs. Skyborn, and whether it's cosmetic-only or gameplay-binding. Depends on J4 being picked up first. See lore doc §6.
+**J6.** Faction selection UX — how/when a player picks Crimson Accord vs. Skyborn, and whether it's cosmetic-only or gameplay-binding. Character creation already has faction selection (`CharacterCreationScreen`); what's still open is only whether faction can ever change post-creation, now that it gates real content (Epic M's Faction branch) rather than being purely cosmetic. See lore doc §6.
 Priority: unscoped. Status: idea.
 
 **J7.** Loadout slot capacity as a progression/monetization lever — start with a medium pouch size (per A7/system design §4.4) and let players unlock additional weapon/skill/passive slots via purchase or achievement rewards. No schema change needed (`Loadout`/`Inventory` are unbounded `Array<T>`); this is a server-side validation rule keyed off an account-level unlock count, whenever it's picked up.
@@ -262,3 +262,174 @@ Priority: n/a. Status: withdrawn (not a real defect).
 
 **K3.** ~~`MatchmakingService.dequeue(connection)` exists but nothing calls it~~ — **superseded 2026-07-09**, not fixed: `MatchmakingService` and its queue retire entirely with B4; there is no connection-cleanup problem in a model with no waiting room.
 Priority: n/a. Status: superseded by B4.
+
+---
+
+## Epic L — Character Progression (Leveling, Stat & Skill Points) — new, part of the 2026-07-10 a–k scope expansion
+
+First slice of a larger scope decision (see project plan §2) to build out account/character progression, quests, a skill tree, a shop, loadout constraints (weight capacity, durability), a ranked ladder, and achievements/statistics before UI/UX work resumes. This epic is the foundation the rest build on — see system design §15 for the full formulas and reasoning.
+
+**L1.** As a player, I level up as my character earns experience, and gain stat points to spend on my core stats.
+Acceptance criteria: `cumulativeExpForLevel(L) = 8 × L²` (system design §15); level cap 50; `RewardService.applyRewards` checks for level-up(s) after applying an exp delta (looping for a multi-level jump in one battle) and grants 3 unspent stat points per level gained, inside the same transaction already writing `characters`/`accounts`/`battle_history`. New `AllocateStatPointsRequest(long characterId, Stats delta)` / `AllocateStatPointsResponse` — ownership-guarded, validates `sum(delta) ≤ unspentStatPoints` and every resulting stat `≤ 60` (the new real per-stat cap, replacing `CharacterCreationScreen.MAX_STAT_VALUE`'s placeholder `20` — that constant needs updating too, ideally shared between both call sites). Migration `V9__Add_Character_Progression_Currencies.sql` adds `unspent_stat_points`.
+Priority: P0. Size: M. Status: done. *(Implemented as `RewardService.expNeededForLevel(L) = 8×L² − 8` — the **anchored** form. The literal `8×L²` in §15's headline and its worked example ("24 exp for level 1→2") disagreed: `8×L²` gives a level-2 threshold of 32, not 24. The increment formula `8×(2L+1)` (which does equal 24 for L=1) is the trustworthy one, so the threshold is anchored to 0 at level 1; §15's own text was corrected to `8×L² − 8` in the same pass rather than leaving code and doc disagreeing. `levelAfter(currentLevel, newExperience)` loops the threshold check (hard-stopping at 50) so one big Elo-gap win can gain multiple levels at once — `RewardService.applyRewards` reads the character's current `level`/`experience` off the already-loaded record, grants `3 × levelsGained` via the renamed `CharacterDao.applyBattleProgress` (a single `UPDATE` folding exp/Elo/level/stat-points/skill-points, with `newLevel` written as an absolute value since `level` isn't additive). Spend path: `CharacterService.allocateStatPoints(accountId, characterId, delta)` — ownership-guarded (drop, not answered), rejects negative components, checks `sum(delta)` against a narrow `getUnspentStatPoints` read, checks every merged stat against the new shared `Stats.MAX_STAT_VALUE = 60` (a `common` constant the creation screen now references too, its old private `20` deleted), then writes via the atomic guarded `spendStatPoints` (`… WHERE unspent_stat_points >= :spent`, returning rows-affected so a lost balance race fails closed rather than overspending). `AllocateStatPointsRequestHandler` wired into `KryoPacketRouter`; packets registered append-only after `AttackResponse`.)*
+
+**L2.** As a player, I earn skill points from battles (win or lose), separate from stat points, to eventually spend on the skill tree.
+Acceptance criteria: 3 skill points on a win, 1 on a loss (system design §15) — same win/loss branch shape as gold/exp, applied inside `RewardService.applyRewards`'s existing transaction. `V9` migration also adds `characters.skill_points`. No spend logic yet — that's the skill tree epic's job.
+Priority: P0. Size: S. Status: done. *(One line in `computeRewards` — `won ? 3 : 1`, no Elo-gap term — folded into the same `applyBattleProgress` write as everything else, so it commits with the rest of the reward. `skill_points` accumulates but has no spend path until Epic M, by design.)*
+
+**L3.** As a player, crossing certain level milestones (10, 20, 30, 40, 50) gives me a small chance at a bonus reward — an item, a pet, or a skill-restoration scroll.
+Acceptance criteria: 10% first-pass chance per milestone crossed, rolled inside the same level-up check as L1. **Requires a new shared "grant an item to a character" capability that does not exist anywhere in the codebase today** — build it once (e.g. `InventoryService`/`CharacterDao.addInventoryItem`) since quests, the shop, and achievements will need the identical capability shortly after, not three separate one-offs. `BattleLeavesInventoryAloneTest` (C2) must be updated *deliberately* to allow this one new write path by name while continuing to fail on any other `CharacterDao` update touching `inventory`/`loadout` — this is the moment that test's own docstring anticipated, not a regression to work around.
+Priority: P1. Size: M. Status: done. *(`RewardService.rollMilestoneBonus(fromLevel, toLevel, Random)` rolls an independent 10% chance per multiple of 10 crossed (a multi-level jump can cross more than one), granting a randomly chosen starter weapon from a curated table. The shared item-grant capability is `CharacterDao.getInventoryForUpdate` (a `SELECT … FOR UPDATE` row lock, the first build of §17's deliberately-simple lock-the-row concurrency approach) + `updateInventory` (`@Json` JSONB write, Jackson handling (de)serialization) — a read-modify-write appending the weapon, done inside `RewardService`'s existing transaction so a granted item commits or rolls back with the rest of the reward. Scope note: §15 also lists pets and skill-restoration scrolls, but pets aren't grantable outside creation and consumable/scroll items don't exist as a concept until Epic O, so this v1.0 pass grants weapons only rather than inventing placeholder item types ahead of the epics that define them. `BattleLeavesInventoryAloneTest`'s structural guard was updated on purpose to allow `updateInventory` by name while still failing on any *other* `CharacterDao` update touching `inventory`/`loadout` (and asserting even the sanctioned writer never touches `loadout`), plus a new positive test that forces a milestone crossing with a stubbed `Random` and asserts the weapon lands in the persisted inventory. Implementation caveat worth recording: Jackson serializes libgdx `Array` as a bean (`{"items":[…],"size":N,…}`), and every character to date persists inventory in the null form (`new Inventory(null,null,null)`), so this grant is the first code to write a real array — the append path tolerates a null `weapons` array to avoid NPE-ing on the existing shape.)*
+
+*Close-out flag on §15's own text, per the L-prompt's instruction not to patch the doc quietly: the exp-curve inconsistency (`8×L²` headline vs. the worked example's `24`) was real, and §15 was corrected to the anchored `8×L² − 8` in this same pass — the doc and code now agree. The other numbers (10% bonus rate, 3/1 skill points, 3 stat points/level, cap 50/60) are first-pass constants awaiting the same playtesting/Monte-Carlo tuning pass §15 and §8.1 already flag; none was quietly changed here.*
+
+---
+
+## Epic M — Skill Tree — new, second slice of the 2026-07-10 a–k scope expansion
+
+Spends Epic L's skill points. See system design §16 for the full tree structure, formulas, and reasoning. Also **resolves J4** (faction-gated crit/dodge skills) — built here as the Faction branch, not a separate mechanic.
+
+**M1.** As a designer, the skill tree's structure and content exist for players to learn from.
+Acceptance criteria: 4 branches (Physical, Magical, Universal, Faction) per system design §16 — Physical/Magical/Universal each 3 level-gated tiers (1/20/40) with 2 nodes per tier (18 nodes); Faction branch ungated beyond faction selection, 1 node per faction (Crimson = crit, Skyborn = dodge) — 20 nodes total for v1.0. `Skill` extended with `passiveEffect`/`passiveMagnitude`/`passiveTargetStat` fields (new `PassiveEffectType`/`StatName` enums), meaningful only when `type() == PASSIVE`. Migration `V10__Add_Character_Skill_Tree.sql` adds `characters.skill_tree JSONB`.
+Priority: P0. Size: L. Status: todo.
+
+**M2.** As a player, I can learn or upgrade a skill tree node using skill points and gold, gated by my level.
+Acceptance criteria: cost table per system design §16 (tier 1: 1 SP + 10 gold/rank; tier 2 and Faction: 3 SP + 60 gold/rank; tier 3: 6 SP + 150 gold/rank; 3 ranks per node). Ownership-guarded; validates character level meets the node's tier gate (Faction nodes only require matching `Character.faction`), sufficient `skill_points` and gold, and rank not already maxed. Learning rank 1 grants the node's `Skill` into `Inventory` via L3's shared item-grant capability; upgrading replaces the previous rank's `Skill` instance (same `Inventory` slot, and same equipped position in `Loadout` if it was slotted) rather than adding a duplicate.
+Priority: P0. Size: M. Status: todo. *(Depends on L1 for level, L2/L3's item-grant capability, M1 for tree content.)*
+
+**M3.** As a player, my equipped active and passive skills share one pool of loadout slots, and passives only benefit me while actually equipped.
+Acceptance criteria: no new `Loadout`/`Inventory` field — `PASSIVE`-type `Skill`s go into the existing `Loadout.skills` array alongside `ACTIVE` ones, shared cap of **5 slots total**, enforced at loadout-save validation (same pattern as existing Inventory-vs-Loadout ownership checks, §4.4). `ActionResolver`'s turn cascade must filter to `ACTIVE` when selecting a turn's action — `PASSIVE` entries count toward the cap but never enter the roll. Passive effects (stat bonus, dodge/crit chance bonus subject to the existing 75% dodge cap, resource cost reduction, weight capacity bonus) are computed once at `BattleParticipant.fromCharacter()` by filtering `loadout.skills()` to `PASSIVE` — not looked up live during resolution.
+Priority: P0. Size: M. Status: todo. *(This is the change that makes M1/M2's passive nodes actually do anything in combat — without it, passives are inert data.)*
+
+**M4.** As a player, I can restore one learned skill node back a rank, recovering most of the skill points I spent.
+Acceptance criteria: refunds 75% of the skill points spent on the node's current rank (not the gold), drops the node one rank, consumes one skill-restoration scroll plus a gold fee (exact scroll acquisition/gold price deferred to the shop/quest epics). Ownership-guarded.
+Priority: P1. Size: S. Status: todo. *(Depends on M2. Scroll acquisition depends on the shop/quest epics, not yet designed — this story can implement the mechanic against a placeholder scroll count if those land later.)*
+
+**M5.** As a player, I can fully reset my skill tree, recovering all the skill points I've ever spent.
+Acceptance criteria: refunds 100% of all skill points spent across every node (not gold), resets every node to un-learned, shop-obtainable (exact price deferred to the shop epic). Ownership-guarded.
+Priority: P2. Size: S. Status: todo. *(Depends on M2. Shop-gating depends on the shop epic, not yet designed.)*
+
+---
+
+## Epic N — Loadout Constraints: Weight Capacity & Weapon Durability — new, third slice of the 2026-07-10 a–k scope expansion
+
+Two new axes layered on the existing weapon pouch, designed together since both modify the same layer. See system design §17 for the full formulas and reasoning. Neither replaces §4.3's soft per-item weight penalty or Stamina's in-battle rotation — both stand unchanged.
+
+**N1.** As a player, my total carry weight across equipped weapons is capped by my Strength, and an over-budget weapon can't be added to my loadout at all.
+Acceptance criteria: `maxCarryWeight = strength × 3` plus any equipped `WEIGHT_CAPACITY_BONUS` passive bonus (system design §17); enforced at loadout-save time as a hard rejection (distinct from and layered on top of §4.3's existing soft `comfortableWeight` per-item penalty, which still applies independently). Weapons only — skills/pets have no `weight` dimension.
+Priority: P1. Size: S. Status: todo. *(Depends on M3 for the passive-bonus term to exist, though the STR-only base formula can land independently first.)*
+
+**N2.** As a player, my weapons wear down with use and stop working until I repair them.
+Acceptance criteria: `Weapon` gains `maxDurability`/`currentDurability` (flat `maxDurability = 20` for all starter weapons, first pass); any weapon that fired at least once in a battle loses 1 durability, applied once per battle regardless of hit count. At 0 durability, the weapon is treated as unaffordable in the pouch cascade — same mechanism as insufficient Stamina, no new branch. Repair (shop action, price deferred to the shop epic) resets `currentDurability` to `maxDurability`.
+
+Requires two things not yet in the codebase: (1) `ResolvedAction` needs a new item-id field — today it only carries a coarse `ActionSource` category and a display label, nothing identifies *which* weapon fired when a pouch holds several; (2) `CharacterDao.updateInventory(long characterId, String inventoryJson)` — a JSONB read-modify-write (not an atomic increment like gold/exp/Elo), locking the character row (`SELECT ... FOR UPDATE`) inside `RewardService`'s existing transaction rather than building real optimistic-concurrency handling (safe given the daily battle cap makes concurrent attacks on one character unrealistic). This is the *second* capability needing a deliberate, named exception in `BattleLeavesInventoryAloneTest` (C2), after L3's item-grant.
+Priority: P1. Size: M. Status: todo. *(Depends on L3's item-grant pathway existing first, and on the `ResolvedAction` item-id extension landing before durability bookkeeping can be written at all.)*
+
+---
+
+## Epic O — Shop, Potions & Pet Health — new, fourth slice of the 2026-07-10 a–k scope expansion
+
+The shop needed real prices before it could be built — this epic exists because §16 (skill points) and §17 (durability) finally gave it some. Potions and pet health are bundled in because both turned out to hinge on the same question (what "restore a resource" means when a battle resolves in one round trip). See system design §18 for the full reasoning.
+
+**O1.** As a player, I can spend gold in a shop to repair weapons, buy skill-restoration scrolls, and reset my skill tree.
+Acceptance criteria: repair costs `5 gold × missingDurability` (targeted at a specific owned weapon, not a catalog purchase); skill-restoration scroll costs 50 gold to buy (separate from M4's usage fee); skill tree reset token costs 1000 gold, consumed to trigger M5. Shop is gold-only — no premium currency sold for anything in it (keeps IAP scoped to the account-level levers already decided separately, never to combat power). Repair must accept a Repair Token as an alternate payment to gold (see O4) from day one, not bolted on later.
+Priority: P1. Size: M. Status: todo. *(Depends on M2/M4/M5 and N2 for the things it's pricing to exist first.)*
+
+**O2.** As a player, I can equip potions that automatically heal me mid-battle when a resource drops below a threshold I set.
+Acceptance criteria: new `SkillType.CONSUMABLE` alongside `ACTIVE`/`PASSIVE` (system design §18) — `Skill` gains `restoresResource` (`HEALTH`/`MANA`/`STAMINA`), `thresholdPercent`, `minRestore`/`maxRestore`, `charges`. Before the existing weapon/skill cascade each turn, equipped `CONSUMABLE` skills are checked in priority order; the first one below its threshold with `charges > 0` fires, heals, consumes a charge, and becomes that turn's entire action (existing cascade skipped that turn; pet action unaffected). No trigger, no change to existing behavior. Shares M3's 5-slot pool with actives/passives.
+Priority: P1. Size: M. Status: todo. *(Depends on M3 for the shared slot pool to exist. This is the game's first conditional/reactive combat logic — keep it isolated to one early per-turn check, not threaded through `ActionResolver`.)*
+
+**O3.** As a player, my pets tire from use and need restoring, the same way weapons do.
+Acceptance criteria: `Pet.healthPoint` becomes real (max health); new `currentHealth` depletes by 1 per battle the pet acts in (not per hit). At 0, the pet's bonus action is skipped that battle — soft, never blocks attacking. Repair via O1's shop action (`5 gold × missingPetHealth`, or Pet Care Kit redemption per O4). Explicitly out of scope: `Pet.defence` stays unresolved — this is wear from use, not damage taken from an opponent; a real pet-vs-opponent targeting mechanic is a separate future question.
+Priority: P2. Size: S. Status: todo. *(Depends on O1 for the repair action to exist.)*
+
+**O4.** As a player, weekly quests can reward tokens that let me repair a weapon or restore a pet for free.
+Acceptance criteria: a Repair Token (redeems for a full weapon repair) and a Pet Care Kit (full pet health restore), usable as alternate payment in O1/O3's repair actions instead of gold. Weekly cadence against the ~5-day depletion cycle (N2) gives a real free relief valve without eliminating the reason to ever pay — deliberately not a daily/automatic regen, which would trivialize the sink entirely (considered and rejected during design). Exact weekly reward table and how tokens are earned is the quest epic's job, not yet designed — this story only needs the redemption mechanic itself to exist in O1/O3.
+Priority: P2. Size: S. Status: todo. *(Depends on O1/O3 for redemption to have something to redeem against; full reward-earning flow depends on the not-yet-designed quest epic.)*
+
+---
+
+## Epic P — Quest System — new, fifth slice of the 2026-07-10 a–k scope expansion
+
+Three quests total for v1.0, deliberately small. See system design §19 — progress is computed live from `battle_history`, no new tracking needed; only claiming needs new state.
+
+**P1.** As a developer, quest progress is computed from existing battle data, not duplicated tracking.
+Acceptance criteria: quest criteria (win counts, period boundaries) are evaluated as live queries against `battle_history` filtered by `character_id` and `created_at > periodStart` — no new per-quest progress counters. Migration `V11__Add_Quest_Claims.sql` adds the `quest_claims` table (`character_id`, `quest_id`, `period_start`, `UNIQUE (character_id, quest_id, period_start)`). The daily battle cap (system design §19) reuses the identical period-boundary query pattern against the same table — build the "start of today"/"start of this week" boundary logic once, shared by both.
+Priority: P0. Size: M. Status: todo.
+
+**P2.** As a player, I can see my current quest progress and claim completed quests for their rewards.
+Acceptance criteria: quest-status request returns all three quests' live progress and claimed/unclaimed state for the current period; claim request re-validates the criteria server-side (never trusts client-reported completion), rejects if already claimed this period (`quest_claims` lookup), applies the reward via the shared `updateInventory`/reward-application primitives (L3/O), and inserts the claim row. Ownership-guarded.
+Priority: P0. Size: M. Status: todo. *(Depends on P1.)*
+
+**P3.** As a player, three quests are available: a daily, a weekly, and a repeatable.
+Acceptance criteria, per system design §19: Daily — "Win 2 battles today" → 1 skill-restoration scroll. Weekly — "Win 10 battles this week" → choice of 2-3 rewards (a weapon/pet, a Repair Token, a Pet Care Kit), player picks which to claim, not randomized. Repeatable — "Win 1 battle" → small gold or a potion charge, capped at 3 claims per day.
+
+**Note on the repeatable quest's cap — different mechanism than daily/weekly, not the same `UNIQUE` trick.** Daily/weekly rely on `quest_claims`' `UNIQUE (character_id, quest_id, period_start)` to allow exactly one claim per period — that only works because `period_start` is the same value for every claim attempt within the period, so a second insert collides and fails. A repeatable quest needs the opposite: multiple rows for the same `quest_id` on the same day. Give each repeatable claim its own `period_start` (its own `claimed_at` moment, not a shared day-boundary value) so the rows don't collide, and enforce the cap with an application-level check instead — `COUNT(*) FROM quest_claims WHERE character_id = ? AND quest_id = ? AND claimed_at > startOfToday`, reject the claim if it's already 3.
+
+---
+
+## Epic Q — Account Levers: Daily Battle Cap & Character Slots — new, sixth slice of the 2026-07-10 a–k scope expansion
+
+Smaller than the preceding epics — the counting mechanism was already settled by Epic P (reuse `battle_history`'s period-boundary query). What's new here is extensibility itself. See system design §20.
+
+**Q1.** As a player, I can only fight up to a daily battle limit per character, and that limit can be permanently increased.
+Acceptance criteria: base cap 5, extended by `characters.bonus_daily_battles INTEGER NOT NULL DEFAULT 0` (effective cap = `5 + bonus_daily_battles`). `AttackService` checks `COUNT(*) FROM battle_history WHERE character_id = ? AND created_at > startOfToday` against the effective cap before resolving the battle — rejects early with a distinct reason code (not a silent drop), exact packet shape deferred to implementation-prompt time. Migration `V12__Add_Account_Progression_Levers.sql` adds this column.
+Priority: P0. Size: S. Status: todo. *(Depends on Epic P's period-boundary query pattern.)*
+
+**Q2.** As a player, my account's character slot count can be permanently increased beyond the starting 3.
+Acceptance criteria: `accounts.bonus_character_slots INTEGER NOT NULL DEFAULT 0` (same V12 migration); `CharacterService.createCharacter`'s existing hardcoded `>= 3` check becomes `>= (3 + account.bonusCharacterSlots)`.
+Priority: P0. Size: S. Status: todo.
+
+**Q3.** As a player, IAP purchases, achievement unlocks, and quest rewards can each grant these bonuses.
+Acceptance criteria: Q1/Q2's fields are the shared target every grant source writes into — this story only needs the fields and a shared "grant bonus" write path to exist, not every source wired up. IAP fulfillment is a platform concern (Epic G/Steam), out of scope here. Achievement-triggered grants depend on unlock-detection/reward-granting logic that does not exist yet — confirmed by reading `AchievementService`, which today only exposes `getPlayerAchievements` with no reward path — real dependency on the not-yet-designed achievements epic (item j). Quest-triggered grants can reuse the existing L3/O4 reward-application primitives; none of Epic P's three locked quests currently grant either bonus, and this story does not change Epic P's content.
+Priority: P2. Size: S. Status: todo. *(Blocked on the achievements epic for the achievement-grant path specifically; IAP and quest paths can land independently once Q1/Q2 exist.)*
+
+---
+
+## Epic R — Ranked Ladder — new, seventh slice of the 2026-07-10 a–k scope expansion
+
+A second, opt-in Elo track layered on top of the existing one, unlocked at level 25. See system design §21 for the full reasoning, including why this is additive (normal battles and `characters.elo` are untouched) rather than a retrofit.
+
+**R1.** As a player who has reached level 25, I can choose to fight a ranked battle instead of a normal one.
+Acceptance criteria: `AttackRequest` gains `BattleMode mode` (`NORMAL` default, `RANKED`); server rejects `RANKED` when `character.level < 25`, same guardrail style as the existing ownership check. Per-battle Gold/Exp/skill-point rewards are identical regardless of mode — no new reward-tuning knob.
+Priority: P1. Size: M. Status: todo. *(Depends on Epic L for `character.level` to exist.)*
+
+**R2.** As a player, my ranked battles are matched against other ranked-eligible opponents by ranked Elo, separate from my normal matchmaking Elo.
+Acceptance criteria: `battle_history` gains `battle_mode VARCHAR(16) NOT NULL DEFAULT 'NORMAL'` and nullable `ranked_elo_delta INTEGER` (migration `V13__Add_Ranked_Battle_Mode_And_Ladder_Claims.sql`, set only on `RANKED` rows). Ranked Elo is never a mutable column — it's computed live as `1000 + SUM(ranked_elo_delta) WHERE character_id = ? AND battle_mode = 'RANKED'`, same "compute from `battle_history`, no duplicate tracking state" pattern already used for quests (Epic P) and the daily battle cap (Epic Q). Ranked opponent selection reuses `AttackService`'s existing band→widen→bot algorithm, keyed off ranked Elo and restricted to level-25+ candidates (new DAO query, same shape as `findOpponentCandidates`); bot fallback uses `BotFactory.createBot(rankedElo)`, no `BotFactory` code change needed.
+Priority: P1. Size: M. Status: todo. *(Depends on R1. Reuses AttackService's existing matching algorithm and BotFactory as-is.)*
+
+**R3.** As a player, I can see a monthly ladder ranking ranked-eligible characters by ranked Elo, and claim a reward once per month based on my standing.
+Acceptance criteria: ladder standing (current or as of a past month's end) is computed via the same bounded-SUM query R2 established, filtered by `created_at <= t` for historical standing — no snapshot job, no scheduler. Reward tiers, first pass (system design §21): top 1 gets an exclusive title + rare pet/weapon + large gold; top 2-10 get gold + a Repair Token/Pet Care Kit bundle; top 11-100 get modest gold; below top 100, no reward. Claim request re-validates standing server-side at claim time (never trusts a client-reported rank) and rejects if already claimed for the period, enforced via `ladder_claims` (`character_id, period_start, claimed_at`, `UNIQUE(character_id, period_start)`, same V13 migration) — same shape as `quest_claims`.
+Priority: P2. Size: M. Status: todo. *(Depends on R2 for ranked Elo to exist. Reward items referencing pets/weapons/tokens depend on Epic O's catalog existing.)*
+
+---
+
+## Epic S — Achievements & Character Page — new, eighth slice of the 2026-07-10 a–k scope expansion, redesigned 2026-07-15
+
+Replaces the existing achievement scaffold rather than extending it — `achievement_definitions`/`account_achievements` already exist with 9 seeded achievements, but nothing in the codebase ever writes an unlock; every achievement is permanently locked today. See system design §22 for the full reasoning, including the account-vs-character scoping question and Steam forward-compatibility notes.
+
+**S1.** As a designer, achievement content is defined declaratively — scope, criteria, and rewards as data, not hand-written per-achievement code.
+Acceptance criteria: `achievement_definitions` gains `scope` (`ACCOUNT`/`CHARACTER`), `criteria_type` + `criteria_params JSONB` (v1.0 vocabulary: `TOTAL_WINS`, `WIN_STREAK`, `FASTEST_WIN_TURNS`, `CHARACTER_LEVEL`, `ITEM_ACQUIRED`, `ACCOUNT_CREATED_BEFORE`), `category`, `hidden`, `points`, and generalized rewards (`gold_reward`, `badge_id`, `title_id`, `bonus_character_slots`, `bonus_daily_battles`, alongside the existing `xp_reward`). `account_achievements` renamed to `achievement_unlocks`, `progress_data` dropped, nullable `character_id` added, uniqueness enforced via two partial indexes (one per scope) rather than a single constraint. Migration `V14__Redesign_Achievements_And_Character_Statistics.sql`. The 9 existing seeded achievements get real `scope`/`criteria_type`/`criteria_params`/`points` values assigned as part of this story's content work.
+Priority: P0. Size: M. Status: todo.
+
+**S2.** As a player, achievements unlock automatically when I meet their criteria, and I receive their rewards immediately.
+Acceptance criteria: a pure `AchievementEvaluator` (Ashley/DB-free, same shape as `ActionResolver`) interprets `criteria_type`/`criteria_params` against live-computed state — no stored progress anywhere. Called from four checkpoints: post-battle inside `RewardService`'s existing transaction (`TOTAL_WINS`/`WIN_STREAK`/`FASTEST_WIN_TURNS`), post-level-up (`CHARACTER_LEVEL`), post-item-grant via L3's shared capability (`ITEM_ACQUIRED`), post-account-creation (`ACCOUNT_CREATED_BEFORE`). Unlock write is `INSERT ... ON CONFLICT DO NOTHING` against the appropriate partial index, atomic with reward application — idempotent, so a re-check of an already-unlocked achievement is a safe no-op. XP/gold rewards target the triggering character; `bonus_character_slots`/`bonus_daily_battles` always apply at the account level.
+Priority: P0. Size: L. Status: todo. *(Depends on S1. Also depends on L1 for level-up detection and L3 for the item-grant hook.)*
+
+**S3.** As a player, I can view a character page showing my stats, battle history, and unlocked achievements.
+Acceptance criteria: `battle_history` gains `turn_count INTEGER NOT NULL DEFAULT 0` (same V14 migration), populated from the turn count `AttackService` already computes but never persisted. Character page is a new read-only aggregate request: character info + level/exp (Epic L) + live-computed statistics (total wins/losses, win percentage, current win streak, fastest win by `turn_count`, last 5 matches) + unlocked achievements/badges (account-scoped ones plus this character's own character-scoped ones) + Achievement Score (sum of unlocked `points`) + equipped title. No new persistence beyond `turn_count` — everything else is computed live from existing tables. Packet shape deferred to implementation-prompt time.
+Priority: P1. Size: M. Status: todo. *(Depends on S1/S2 for achievements to have unlockable state.)*
+
+**S4.** As a player, I can equip a title I've unlocked so it displays on my character page.
+Acceptance criteria: `characters.equipped_title VARCHAR(50)` (same V14 migration); a set-title request validates the requested title is unlocked for the character's account (join against `achievement_unlocks`/`achievement_definitions`) before allowing it. Ownership-guarded.
+Priority: P2. Size: S. Status: todo. *(Depends on S1/S2 for title-granting achievements to exist.)*
+
+---
+
+## Epic T — Character Customization — new, ninth and final slice of the 2026-07-10 a–k scope expansion
+
+Purely cosmetic — name, faction, and stat distribution already exist in the creation flow; this is only the leftover piece. See system design §23.
+
+**T1.** As a player, I can choose my character's gender, hair type, hair color, and skin color at creation.
+Acceptance criteria: `characters.appearance JSONB NOT NULL DEFAULT '{}'::jsonb` (migration `V15__Add_Character_Appearance.sql`), storing `{gender, hairType, hairColor, skinColor}`. Server validates the submitted values against a small curated v1.0 set (2 genders, 4 skin tones, 4 hair colors, 3 hair types) in `CharacterService.createCharacter`, alongside the existing name-uniqueness and slot-count checks — rejects anything outside that set. Set once at creation; no edit endpoint in v1.0. Not consumed by rendering yet (M4 is still placeholder-rendering); real options expand once Epic E1/M5's art pipeline exists.
+Priority: P2. Size: S. Status: todo.

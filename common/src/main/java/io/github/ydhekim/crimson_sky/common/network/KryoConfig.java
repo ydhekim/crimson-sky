@@ -105,5 +105,10 @@ public class KryoConfig {
         // indistinguishable from a real one at the protocol level (system design §7).
         kryo.register(AttackRequest.class, new RecordSerializer<>(AttackRequest.class));
         kryo.register(AttackResponse.class, new RecordSerializer<>(AttackResponse.class));
+
+        // Character progression (Epic L / system design §15) — spending earned stat points. Appended
+        // after AttackResponse so every positional ID above is untouched (system design §5, append-only).
+        kryo.register(AllocateStatPointsRequest.class, new RecordSerializer<>(AllocateStatPointsRequest.class));
+        kryo.register(AllocateStatPointsResponse.class, new RecordSerializer<>(AllocateStatPointsResponse.class));
     }
 }

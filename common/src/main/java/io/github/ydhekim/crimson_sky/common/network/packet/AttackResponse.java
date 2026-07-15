@@ -18,11 +18,17 @@ import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
  * <p>{@code battleId} is a per-battle correlation id for logs/telemetry; it addresses nothing the
  * client can look up, since no battle outlives the request that created it.
  *
- * <p>The three deltas (story C1) are what this battle actually paid the attacker — already applied and
- * committed server-side by the time this packet is sent, so they are a report, not a promise the client
- * has to redeem. They reveal nothing about the opponent's nature: a bot fight's Elo delta is computed
- * against the attacker's own rating (system design §8.1), which is exactly what an even real matchup
- * produces. {@code eloDelta} is negative on a loss.
+ * <p>The three currency deltas (story C1) are what this battle actually paid the attacker — already
+ * applied and committed server-side by the time this packet is sent, so they are a report, not a promise
+ * the client has to redeem. They reveal nothing about the opponent's nature: a bot fight's Elo delta is
+ * computed against the attacker's own rating (system design §8.1), which is exactly what an even real
+ * matchup produces. {@code eloDelta} is negative on a loss.
+ *
+ * <p>The progression fields (Epic L, system design §15) are the same kind of already-committed report:
+ * {@code skillPointsGained} (per battle, win or lose), plus {@code levelsGained}/{@code statPointsGained}
+ * when this battle's exp crossed one or more level thresholds, and {@code bonusRewardGranted} — the name
+ * of an item granted by the every-10-level milestone roll, or {@code null} when no milestone fired or its
+ * roll missed.
  */
 public record AttackResponse(
     long battleId,
@@ -31,6 +37,10 @@ public record AttackResponse(
     Array<Array<ResolvedAction>> turns,
     int goldDelta,
     long expDelta,
-    int eloDelta
+    int eloDelta,
+    int skillPointsGained,
+    int levelsGained,
+    int statPointsGained,
+    String bonusRewardGranted
 ) {
 }

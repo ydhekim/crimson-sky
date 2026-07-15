@@ -3,10 +3,12 @@ package io.github.ydhekim.crimson_sky.server.service;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
+import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class CharacterService {
@@ -134,6 +136,77 @@ public class CharacterService {
             }
         } catch (Exception e) {
             log.error("Exception occurred while creating character '" + character.name() + "' for account ID: " + accountId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    /**
+     * The merged stats and remaining balance after a successful stat-point spend (Epic L / §15). Kept as
+     * a small server-side result so {@code CharacterService} stays free of network-packet types; the
+     * handler folds this into an {@code AllocateStatPointsResponse}.
+     */
+    public record AllocateStatPointsResult(Stats newStats, int unspentStatPoints) {
+    }
+
+    /**
+     * Spends stat points on behalf of {@code accountId} (Epic L / system design §15). Validates, in order:
+     * ownership (the same guardrail as every character-scoped action, failing closed), that no delta
+     * component is negative, that {@code sum(delta)} fits the unspent balance
+     * ({@code STAT_POINTS_INSUFFICIENT}), and that no merged stat exceeds {@link Stats#MAX_STAT_VALUE}
+     * ({@code STAT_CAP_EXCEEDED}). The merged write itself is atomic and guarded
+     * ({@link CharacterDao#spendStatPoints}); if it reports zero rows the balance lost a race and this
+     * still fails with {@code STAT_POINTS_INSUFFICIENT} rather than silently succeeding.
+     *
+     * <p>There is a small TOCTOU gap between reading the current stats/balance and the guarded write —
+     * accepted deliberately, the same simplification durability's concurrency model takes (§17): one
+     * account running two simultaneous spends for the same character is not a realistic case.
+     */
+    public ServiceResult<AllocateStatPointsResult> allocateStatPoints(long accountId, long characterId, Stats delta) {
+        try {
+            if (!isCharacterOwnedBy(accountId, characterId)) {
+                log.info("Stat-point allocation rejected: character " + characterId
+                    + " is not owned by account " + accountId);
+                return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+            }
+
+            if (delta.hasNegativeComponent()) {
+                log.info("Stat-point allocation rejected for character " + characterId
+                    + ": a delta component was negative.");
+                return ServiceResult.failure(MessageCode.STAT_POINTS_INSUFFICIENT);
+            }
+
+            Optional<CharacterEntity> entity = characterDao.findById(characterId);
+            Optional<Integer> balance = characterDao.getUnspentStatPoints(characterId);
+            if (entity.isEmpty() || balance.isEmpty()) {
+                log.info("Stat-point allocation failed: character " + characterId + " could not be loaded.");
+                return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+            }
+
+            int spent = delta.total();
+            if (spent > balance.get()) {
+                log.info("Stat-point allocation rejected for character " + characterId + ": spend of "
+                    + spent + " exceeds balance of " + balance.get() + ".");
+                return ServiceResult.failure(MessageCode.STAT_POINTS_INSUFFICIENT);
+            }
+
+            Stats merged = entity.get().stats().plus(delta);
+            if (merged.max() > Stats.MAX_STAT_VALUE) {
+                log.info("Stat-point allocation rejected for character " + characterId
+                    + ": a resulting stat would exceed the cap of " + Stats.MAX_STAT_VALUE + ".");
+                return ServiceResult.failure(MessageCode.STAT_CAP_EXCEEDED);
+            }
+
+            if (characterDao.spendStatPoints(characterId, merged, spent) == 0) {
+                log.info("Stat-point allocation lost a race on the balance for character " + characterId + ".");
+                return ServiceResult.failure(MessageCode.STAT_POINTS_INSUFFICIENT);
+            }
+
+            log.info("Character " + characterId + " spent " + spent + " stat points; "
+                + (balance.get() - spent) + " remaining.");
+            return ServiceResult.success(MessageCode.SUCCESS,
+                new AllocateStatPointsResult(merged, balance.get() - spent));
+        } catch (Exception e) {
+            log.error("Exception during stat-point allocation for character " + characterId, e);
             return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
         }
     }

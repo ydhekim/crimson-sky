@@ -24,6 +24,7 @@ public class KryoPacketRouter implements PacketRouter {
         handlers.put(CreateCharacterRequest.class, new CreateCharacterRequestHandler(characterService));
         handlers.put(DeleteCharacterRequest.class, new DeleteCharacterRequestHandler(characterService));
         handlers.put(AttackRequest.class, new AttackRequestHandler(attackService, rewardService));
+        handlers.put(AllocateStatPointsRequest.class, new AllocateStatPointsRequestHandler(characterService));
         handlers.put(LocalizationRequest.class, new LocalizationRequestHandler(localizationService));
         handlers.put(AchievementListRequest.class, new AchievementListRequestHandler(achievementService));
         handlers.put(SaveAccountSettingsRequest.class, new SaveAccountSettingsRequestHandler(accountService));

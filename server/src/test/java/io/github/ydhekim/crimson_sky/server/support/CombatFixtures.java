@@ -50,6 +50,18 @@ public final class CombatFixtures {
             new Loadout(new Array<Weapon>(), new Array<Skill>(), new Array<Pet>()));
     }
 
+    /**
+     * The {@link #character} fixture, re-stamped at a given {@code level}/{@code experience} — for Epic L
+     * tests that need a character starting near a level milestone without disturbing its (fixed-outcome)
+     * combat stats.
+     */
+    public static Character characterAtLevel(long id, long accountId, String name, int level, long experience) {
+        Character base = character(id, accountId, name);
+        return new Character(base.id(), base.accountId(), base.name(), base.faction(), level, experience,
+            base.maxHp(), base.maxMp(), base.maxStamina(), base.baseDef(), base.baseAtk(),
+            base.stats(), base.inventory(), base.loadout());
+    }
+
     /** A character guaranteed to land exactly one 150-damage weapon hit per turn. */
     public static Character character(long id, long accountId, String name) {
         Stats stats = new Stats(

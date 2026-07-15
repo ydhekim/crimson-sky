@@ -96,11 +96,13 @@ class BattleLeavesInventoryAloneTest {
     }
 
     @Test
-    void noCharacterUpdateStatementCanEvenReachTheStoredItems() {
-        // The structural half: the DAO layer offers no way to modify a stored inventory/loadout outside
-        // character creation, so no future battle-side code can start doing it by accident. An item-loss
-        // skill that needs to write items would have to add such a statement — and change this test
-        // deliberately, which is exactly the conversation C2 exists to force.
+    void onlyTheSanctionedGrantPathCanReachTheStoredItems() {
+        // The structural half: exactly ONE UPDATE — `updateInventory`, Epic L's bonus item-grant — may
+        // reach the stored items, and even it must not touch `loadout`. Every other UPDATE is still barred
+        // from `inventory`/`loadout` entirely, so no battle-side code can start writing there by accident.
+        // This is the deliberate, named exception C2's docstring anticipated — not a regression. The next
+        // capability that needs to write items (durability, §N) adds its method here the same way.
+        boolean sawSanctionedInventoryWriter = false;
         for (Method method : CharacterDao.class.getDeclaredMethods()) {
             SqlUpdate update = method.getAnnotation(SqlUpdate.class);
             if (update == null) {
@@ -110,10 +112,68 @@ class BattleLeavesInventoryAloneTest {
             if (!sql.startsWith("update")) {
                 continue; // INSERT (character creation) and DELETE are not what this rule is about.
             }
+            if (method.getName().equals("updateInventory")) {
+                sawSanctionedInventoryWriter = true;
+                assertTrue(sql.contains("inventory"), "updateInventory must be the inventory grant path");
+                assertFalse(sql.contains("loadout"),
+                    "even the sanctioned inventory writer must not touch `loadout` (§8)");
+                continue;
+            }
             assertFalse(sql.contains("inventory"),
-                "CharacterDao." + method.getName() + " updates `inventory` — items are never lost from storage (§8)");
+                "CharacterDao." + method.getName() + " updates `inventory` — only updateInventory may (§8/§15)");
             assertFalse(sql.contains("loadout"),
                 "CharacterDao." + method.getName() + " updates `loadout` — items are never lost from storage (§8)");
         }
+        assertTrue(sawSanctionedInventoryWriter,
+            "the one sanctioned inventory writer (updateInventory) must exist — otherwise this guard is vacuous");
+    }
+
+    @Test
+    void aMilestoneBonusRollGrantsAWeaponIntoThePersistedInventory() {
+        // The first real exercise of the new write path (Epic L / §15): a character seeded two exp below
+        // the level-10 threshold (expNeededForLevel(10) == 792) crosses into level 10 on any battle, and a
+        // Random stubbed to always pass the 10% roll and pick weapon index 0 grants Twin Daggers. The grant
+        // must land in the character's *persisted* inventory, committed with the rest of the reward.
+        long attacker = 1L;
+        long opponent = 2L;
+        long accountA = 10L;
+        long accountB = 20L;
+        String nullInventory = "{\"weapons\":null,\"skills\":null,\"pets\":null}";
+
+        FakeCharacterDao dao = new FakeCharacterDao()
+            .with(CombatFixtures.characterAtLevel(attacker, accountA, "Ayla", 9, 790L), accountA, 1000)
+            .with(CombatFixtures.character(opponent, accountB, "Boran"), accountB, 1000);
+        TestDatabase bonusDb = TestDatabase.create()
+            .withAccount(accountA, 0L).withAccount(accountB, 0L)
+            .withCharacter(attacker, accountA, "Ayla", 9, 790L, 1000, nullInventory, nullInventory)
+            .withCharacter(opponent, accountB, "Boran", 1, 0L, 1000, nullInventory, nullInventory);
+
+        CharacterService characterService = new CharacterService(dao);
+        AttackService bonusAttack = new AttackService(characterService, new BotFactory(new Random(42L)), new Random(42L));
+        RewardService bonusReward = new RewardService(bonusDb.jdbi(), characterService, alwaysRollsBonus());
+
+        Optional<AttackResult> result = bonusAttack.attack(attacker);
+        assertTrue(result.isPresent(), "precondition: the battle resolves");
+        RewardOutcome outcome = bonusReward.applyRewards(result.get());
+
+        assertEquals(10, bonusDb.levelOf(attacker), "790 + exp delta crosses the level-10 milestone");
+        assertEquals("Twin Daggers", outcome.bonusRewardGranted(), "the granted weapon is reported to the client");
+        assertTrue(bonusDb.inventoryJsonOf(attacker).contains("Twin Daggers"),
+            "the bonus weapon is written into the character's persisted inventory");
+    }
+
+    /** A {@link Random} that always passes the 10% milestone roll and picks the first bonus weapon. */
+    private static Random alwaysRollsBonus() {
+        return new Random() {
+            @Override
+            public double nextDouble() {
+                return 0.0; // strictly < BONUS_ROLL_CHANCE, so every milestone roll succeeds
+            }
+
+            @Override
+            public int nextInt(int bound) {
+                return 0; // Twin Daggers, the first entry in the bonus table
+            }
+        };
     }
 }

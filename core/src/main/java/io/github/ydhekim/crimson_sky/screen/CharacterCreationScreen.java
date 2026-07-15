@@ -20,7 +20,10 @@ import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
 public class CharacterCreationScreen extends BaseScreen {
 
-    private static final int MAX_STAT_VALUE = 20;
+    // Per-stat cap is the shared lifetime ceiling (Stats.MAX_STAT_VALUE, system design §15), so the
+    // creation screen and server-side spend validation can never drift apart. The creation pool below is
+    // small enough that no stat gets near the cap at creation — it becomes the binding limit only later,
+    // as leveling grants points to spend.
     private static final int INITIAL_STAT_POOL = 20;
 
     private VisTextField nameField;
@@ -147,7 +150,7 @@ public class CharacterCreationScreen extends BaseScreen {
         new Tooltip.Builder(description).target(infoButton).build();
         rowTable.add(infoButton).padRight(5);
 
-        VisProgressBar progressBar = new VisProgressBar(0, MAX_STAT_VALUE, 1, false, "stat-bar");
+        VisProgressBar progressBar = new VisProgressBar(0, Stats.MAX_STAT_VALUE, 1, false, "stat-bar");
         progressBar.setValue(stats.get(name));
         statProgressBars.put(name, progressBar);
         rowTable.add(progressBar).expandX().fillX().padRight(10);
@@ -232,7 +235,7 @@ public class CharacterCreationScreen extends BaseScreen {
     private void adjustStat(String name, int amount) {
         int currentValue = stats.get(name);
 
-        if (amount > 0 && statPool > 0 && currentValue < MAX_STAT_VALUE) {
+        if (amount > 0 && statPool > 0 && currentValue < Stats.MAX_STAT_VALUE) {
             statPool--;
             stats.put(name, currentValue + 1);
         } else if (amount < 0 && currentValue > 0) {
