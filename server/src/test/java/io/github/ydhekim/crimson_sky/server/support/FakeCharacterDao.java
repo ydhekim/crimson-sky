@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.server.support;
 
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
@@ -145,9 +146,48 @@ public class FakeCharacterDao implements CharacterDao {
         Character c = row.character();
         Character updated = new Character(c.id(), c.accountId(), c.name(), c.faction(), c.level(),
             c.experience(), c.maxHp(), c.maxMp(), c.maxStamina(), c.baseDef(), c.baseAtk(),
-            stats, c.inventory(), c.loadout());
+            stats, c.inventory(), c.loadout(), c.skillTree());
         rows.put(characterId, new Row(updated, row.accountId(), row.elo(), row.unspentStatPoints() - spent));
         return 1;
+    }
+
+    /**
+     * Persists the whole loadout so a follow-up {@code getCharacters} reflects it — the loadout-save path
+     * (system design §4.4/§16) is a plain overwrite, not a transactional grant, so the fake models it
+     * directly rather than throwing the way the reward/skill-tree write paths do.
+     */
+    @Override
+    public void updateLoadout(long characterId, Loadout loadout) {
+        Row row = rows.get(characterId);
+        if (row == null) {
+            return;
+        }
+        Character c = row.character();
+        Character updated = new Character(c.id(), c.accountId(), c.name(), c.faction(), c.level(),
+            c.experience(), c.maxHp(), c.maxMp(), c.maxStamina(), c.baseDef(), c.baseAtk(),
+            c.stats(), c.inventory(), loadout, c.skillTree());
+        rows.put(characterId, new Row(updated, row.accountId(), row.elo(), row.unspentStatPoints()));
+    }
+
+    /** Skill-tree spend goes through the transaction's own DAO handle, never the fake's read models. */
+    @Override
+    public Optional<Map<String, Integer>> getSkillTree(long characterId) {
+        throw new UnsupportedOperationException("skill-tree spends are written through the transaction's own DAO handle");
+    }
+
+    @Override
+    public void updateSkillTree(long characterId, Map<String, Integer> skillTree) {
+        throw new UnsupportedOperationException("skill-tree spends are written through the transaction's own DAO handle");
+    }
+
+    @Override
+    public Optional<Integer> getSkillPoints(long characterId) {
+        throw new UnsupportedOperationException("skill-tree spends are written through the transaction's own DAO handle");
+    }
+
+    @Override
+    public int spendSkillPoints(long characterId, int cost) {
+        throw new UnsupportedOperationException("skill-tree spends are written through the transaction's own DAO handle");
     }
 
     @Override

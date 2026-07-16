@@ -51,19 +51,19 @@ class PouchResolutionTest {
     }
 
     private static Skill spark() {
-        return new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40);
+        return new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40, null, 0, null);
     }
 
     private static Skill lightningBolt() {
-        return new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60);
+        return new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60, null, 0, null);
     }
 
     private static Skill fireball() {
-        return new Skill(3L, "Fireball", "", SkillType.ACTIVE, 45, Difficulty.HARD, 45, 75);
+        return new Skill(3L, "Fireball", "", SkillType.ACTIVE, 45, Difficulty.HARD, 45, 75, null, 0, null);
     }
 
     private static Skill meteor() {
-        return new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110);
+        return new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110, null, 0, null);
     }
 
     /** Stats(str, dex, vit, int, wis, spi, spd, ins). */

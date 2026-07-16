@@ -152,17 +152,19 @@ public class BattleEngine {
 
         int defenderDef = defender.baseStats().baseDefence;
         int defenderSpeed = defender.statsComponent().stats.speed();
+        int defenderDodgeBonus = defender.passiveModifiers().dodgeChanceBonus;
+        int attackerCritBonus = attacker.passiveModifiers().critChanceBonus;
 
         // Step 3 — apply. Character hits first; then pet hits only if the defender is still standing.
         ResolvedAction characterEntry = applyEntry(
             charRes.action(), charRes.minAttack(), charRes.maxAttack(), charRes.pathStatValue(),
-            defender, defenderDef, defenderSpeed);
+            defender, defenderDef, defenderSpeed, defenderDodgeBonus, attackerCritBonus);
 
         ResolvedAction petEntry = null;
         if (petRes != null && !defender.isDefeated()) {
             petEntry = applyEntry(
                 petRes.action(), petRes.minAttack(), petRes.maxAttack(), 0 /* pets get no stat bonus */,
-                defender, defenderDef, defenderSpeed);
+                defender, defenderDef, defenderSpeed, defenderDodgeBonus, attackerCritBonus);
         }
         // If the character's hits killed, the pet entry is intentionally dropped from the Result Set
         // (a kill mid-array skips everything remaining in that set, §4.2).
@@ -178,16 +180,18 @@ public class BattleEngine {
      */
     private ResolvedAction applyEntry(ResolvedAction entry, int minAttack, int maxAttack,
                                       int pathStatValue, BattleParticipant defender,
-                                      int defenderDef, int defenderSpeed) {
+                                      int defenderDef, int defenderSpeed,
+                                      int defenderDodgeBonus, int attackerCritBonus) {
         if (entry.failed()) {
             return entry; // Burned cast — no hits land
         }
         int total = 0;
         for (int hit = 0; hit < entry.frequency(); hit++) {
-            if (DamageCalculator.rollDodge(defenderSpeed, rng)) {
+            if (DamageCalculator.rollDodge(defenderSpeed, defenderDodgeBonus, rng)) {
                 continue; // dodged — no damage draw consumed for this hit
             }
-            int damage = DamageCalculator.rollHitDamage(minAttack, maxAttack, pathStatValue, defenderDef, rng);
+            int damage = DamageCalculator.rollHitDamage(
+                minAttack, maxAttack, pathStatValue, defenderDef, attackerCritBonus, rng);
             defender.health().currentHealth -= damage;
             total += damage;
             if (defender.isDefeated()) {

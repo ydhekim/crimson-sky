@@ -97,12 +97,15 @@ class BattleLeavesInventoryAloneTest {
 
     @Test
     void onlyTheSanctionedGrantPathCanReachTheStoredItems() {
-        // The structural half: exactly ONE UPDATE — `updateInventory`, Epic L's bonus item-grant — may
-        // reach the stored items, and even it must not touch `loadout`. Every other UPDATE is still barred
-        // from `inventory`/`loadout` entirely, so no battle-side code can start writing there by accident.
-        // This is the deliberate, named exception C2's docstring anticipated — not a regression. The next
-        // capability that needs to write items (durability, §N) adds its method here the same way.
+        // The structural half: exactly TWO sanctioned, named UPDATEs may reach the stored item columns —
+        // `updateInventory` (Epic L's bonus item-grant / §16's skill grant) for `inventory`, and
+        // `updateLoadout` (§16's loadout-save capability) for `loadout` — and neither may touch the other's
+        // column. Every other UPDATE is still barred from `inventory`/`loadout` entirely, so no battle-side
+        // code can start writing there by accident. These are the deliberate, named exceptions C2's
+        // docstring anticipated — not regressions. The next capability that needs to write items (durability,
+        // §N) adds its method here the same way.
         boolean sawSanctionedInventoryWriter = false;
+        boolean sawSanctionedLoadoutWriter = false;
         for (Method method : CharacterDao.class.getDeclaredMethods()) {
             SqlUpdate update = method.getAnnotation(SqlUpdate.class);
             if (update == null) {
@@ -119,13 +122,22 @@ class BattleLeavesInventoryAloneTest {
                     "even the sanctioned inventory writer must not touch `loadout` (§8)");
                 continue;
             }
+            if (method.getName().equals("updateLoadout")) {
+                sawSanctionedLoadoutWriter = true;
+                assertTrue(sql.contains("loadout"), "updateLoadout must be the loadout-save path (§16)");
+                assertFalse(sql.contains("inventory"),
+                    "even the sanctioned loadout writer must not touch `inventory` (§8)");
+                continue;
+            }
             assertFalse(sql.contains("inventory"),
                 "CharacterDao." + method.getName() + " updates `inventory` — only updateInventory may (§8/§15)");
             assertFalse(sql.contains("loadout"),
-                "CharacterDao." + method.getName() + " updates `loadout` — items are never lost from storage (§8)");
+                "CharacterDao." + method.getName() + " updates `loadout` — only updateLoadout may (§8/§16)");
         }
         assertTrue(sawSanctionedInventoryWriter,
             "the one sanctioned inventory writer (updateInventory) must exist — otherwise this guard is vacuous");
+        assertTrue(sawSanctionedLoadoutWriter,
+            "the one sanctioned loadout writer (updateLoadout) must exist — otherwise this guard is vacuous");
     }
 
     @Test
