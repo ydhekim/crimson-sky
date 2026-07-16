@@ -145,7 +145,7 @@ public class SkillTreeService {
      */
     private void grantOrReplace(CharacterDao characterDao, long characterId, Skill granted) {
         Inventory inventory = characterDao.getInventoryForUpdate(characterId)
-            .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>()));
+            .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()));
         Array<Skill> skills = inventory.skills() != null ? inventory.skills() : new Array<>();
 
         int existingIndex = -1;
@@ -160,7 +160,9 @@ public class SkillTreeService {
         } else {
             skills.add(granted); // rank 1 — a fresh grant
         }
+        // The shop's consumables (§18) ride through untouched: a skill grant is one in-memory
+        // transformation of the same blob, and must not reset a field it has no opinion about.
         characterDao.updateInventory(characterId,
-            new Inventory(inventory.weapons(), skills, inventory.pets()));
+            new Inventory(inventory.weapons(), skills, inventory.pets(), inventory.consumables()));
     }
 }

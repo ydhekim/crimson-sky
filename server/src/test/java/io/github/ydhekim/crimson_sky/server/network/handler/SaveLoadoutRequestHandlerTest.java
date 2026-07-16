@@ -57,7 +57,7 @@ class SaveLoadoutRequestHandlerTest {
 
     /** A character owning exactly {@link #SWORD} and {@link #IRON_GRIP}, with nothing yet equipped. */
     private void seed(long characterId, long accountId) {
-        Inventory inventory = new Inventory(Array.with(SWORD), Array.with(IRON_GRIP), new Array<>());
+        Inventory inventory = new Inventory(Array.with(SWORD), Array.with(IRON_GRIP), new Array<>(), new java.util.HashMap<>());
         Character c = new Character(characterId, accountId, "Ayla", Faction.A, 5, 0, 100, 100, 100, 10, 10,
             new Stats(5, 5, 5, 5, 5, 5, 5, 5), inventory,
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());

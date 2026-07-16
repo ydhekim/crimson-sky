@@ -226,7 +226,9 @@ public class CharacterCreationScreen extends BaseScreen {
         Character newCharacter = new Character(
             0, 0, characterName, selectedFaction, 1, 0, 100, 100, 100, 10, 10,
             characterStats,
-            new Inventory(null, null, null),
+            // Null arrays match what every character created to date persists; the consumables map is
+            // real-but-empty on purpose (§18) — an absent one would NPE the first shop purchase.
+            new Inventory(null, null, null, new HashMap<>()),
             new Loadout(null, null, null),
             new HashMap<>()
         );

@@ -60,7 +60,8 @@ class CharacterServiceSaveLoadoutWeightTest {
         // Owns everything it could equip, so the ownership check (which runs *after* the weight gate)
         // can never be what rejects a save here.
         Inventory inventory = new Inventory(
-            Array.with(weapon(1L), weapon(2L), weapon(3L)), Array.with(PACK_MULE), new Array<>());
+            Array.with(weapon(1L), weapon(2L), weapon(3L)), Array.with(PACK_MULE), new Array<>(),
+            new HashMap<>());
         Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.A, 5, 0, 100, 100, 100, 0, 0,
             new Stats(10 /* STR → 30.0 carry budget */, 5, 5, 5, 5, 5, 5, 5), inventory,
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());
@@ -130,7 +131,7 @@ class CharacterServiceSaveLoadoutWeightTest {
         dao = new FakeCharacterDao();
         Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.A, 5, 0, 100, 100, 100, 0, 0,
             new Stats(10, 5, 5, 5, 5, 5, 5, 5),
-            new Inventory(Array.with(exact), new Array<>(), new Array<>()),
+            new Inventory(Array.with(exact), new Array<>(), new Array<>(), new java.util.HashMap<>()),
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());
         dao.with(c, ACCOUNT, 1000);
 

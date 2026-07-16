@@ -21,5 +21,11 @@ public enum MessageCode {
     // Loadout save (system design §4.4/§16/§17)
     LOADOUT_ITEM_NOT_OWNED,
     LOADOUT_SKILL_SLOTS_EXCEEDED,
-    LOADOUT_WEIGHT_EXCEEDED
+    LOADOUT_WEIGHT_EXCEEDED,
+
+    // Shop (system design §18)
+    SHOP_ITEM_NOT_FOUND,
+    SHOP_NOTHING_TO_REPAIR,
+    SHOP_GOLD_INSUFFICIENT,
+    SHOP_TOKEN_INSUFFICIENT
 }

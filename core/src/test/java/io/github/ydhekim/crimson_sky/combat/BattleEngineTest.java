@@ -38,7 +38,7 @@ class BattleEngineTest {
             0, 0, name, Faction.A, 1, 0,
             maxHp, 100 /* maxMp */, 100 /* maxStamina */, 0 /* baseDef → full damage lands */, 0,
             stats(80 /* STR → weapon draw succeeds */, speed),
-            new Inventory(new Array<>(), new Array<>(), new Array<>()),
+            new Inventory(new Array<>(), new Array<>(), new Array<>(), new java.util.HashMap<>()),
             new Loadout(weapons, new Array<Skill>(), new Array<>()),
             new java.util.HashMap<>());
     }

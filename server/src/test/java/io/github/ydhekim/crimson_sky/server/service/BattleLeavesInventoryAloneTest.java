@@ -1,5 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
+import io.github.ydhekim.crimson_sky.common.model.Pet;
+import io.github.ydhekim.crimson_sky.common.model.Tameness;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
@@ -60,7 +62,7 @@ class BattleLeavesInventoryAloneTest {
      */
     private static final String INVENTORY_JSON =
         "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,\"currentDurability\":20}],"
-            + "\"skills\":[],\"pets\":[]}";
+            + "\"skills\":[],\"pets\":[],\"consumables\":{}}";
     private static final String LOADOUT_JSON =
         "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,\"currentDurability\":20}],"
             + "\"skills\":[],\"pets\":[]}";
@@ -130,6 +132,51 @@ class BattleLeavesInventoryAloneTest {
             "wear touches current durability only — max is what repair restores to (Epic O)");
     }
 
+    @Test
+    void petWearAndEveryShopWriteReachInventoryThroughTheSameSanctionedPath() {
+        // §18 added three more things that mutate `inventory` — pet wear, repair, and a consumable purchase.
+        // None of them needed a new exception in the structural test below, and this is the empirical half
+        // of why: all three are in-memory transformations before the same `updateInventory` call, and all
+        // three land. The pet is seeded worn on purpose, so the repair has something real to restore.
+        long pet = 7L;
+        String inventory = "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,"
+            + "\"currentDurability\":20}],\"skills\":[],"
+            + "\"pets\":[{\"id\":7,\"name\":\"Bear\",\"tameness\":\"LOYAL\",\"healthPoint\":80,"
+            + "\"currentHealth\":40}],\"consumables\":{}}";
+
+        Pet bear = new Pet(pet, "Bear", "", Tameness.LOYAL, 80, 15, 20, 36, 40);
+        FakeCharacterDao dao = new FakeCharacterDao()
+            // Insight 90 + LOYAL (+20) → the gate reads 110: the pet acts, so its wear is not seed-dependent.
+            .with(CombatFixtures.characterWithPet(ATTACKER, ACCOUNT_A, "Ayla", bear, 90), ACCOUNT_A, 1000)
+            .with(CombatFixtures.character(OPPONENT, ACCOUNT_B, "Boran"), ACCOUNT_B, 1000);
+        TestDatabase shopDb = TestDatabase.create()
+            .withAccount(ACCOUNT_A, 1000L).withAccount(ACCOUNT_B, 0L)
+            .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
+            .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
+
+        CharacterService characterService = new CharacterService(dao);
+        AttackService shopAttack = new AttackService(
+            characterService, new BotFactory(new Random(42L)), new Random(42L));
+        RewardService shopReward = new RewardService(shopDb.jdbi(), characterService);
+        ShopService shopService = new ShopService(shopDb.jdbi(), characterService);
+
+        Optional<AttackResult> result = shopAttack.attack(ATTACKER);
+        assertTrue(result.isPresent(), "precondition: the battle resolves");
+        shopReward.applyRewards(result.get());
+        assertTrue(shopDb.inventoryJsonOf(ATTACKER).contains("\"currentHealth\":39"),
+            "the acting pet's wear landed: 40 → 39 (§18)");
+
+        assertTrue(shopService.repairPet(ACCOUNT_A, ATTACKER, pet, false).success());
+        assertTrue(shopDb.inventoryJsonOf(ATTACKER).contains("\"currentHealth\":80"),
+            "and the shop restored it to full through that same one write path");
+
+        assertTrue(shopService.buyScroll(ACCOUNT_A, ATTACKER).success());
+        String after = shopDb.inventoryJsonOf(ATTACKER);
+        assertTrue(after.contains("\"skill_restoration_scroll\":1"), "a purchase lands in the same column");
+        assertTrue(after.contains("Testing Hammer"), "and none of it ever took a stored item away (§8)");
+        assertTrue(after.contains("\"name\":\"Bear\""));
+    }
+
     /** Weapon entries in a stored inventory blob, counted by the one key every weapon has. */
     private static int weaponCountOf(String inventoryJson) {
         return inventoryJson.split("\"id\":", -1).length - 1;
@@ -149,6 +196,11 @@ class BattleLeavesInventoryAloneTest {
         // (§18 makes that the standing rule for every feature that mutates `inventory` from here on — pet
         // health, consumable charges). If a future pass adds a third name to this list, that is the design
         // going wrong, not the test.
+        //
+        // Still exactly two after Epic O, which is the first real test of that rule: §18's pet-health wear,
+        // the shop's repairs and its consumable purchases are four more mutations of `inventory` and needed
+        // zero new names here. The empirical half is
+        // `petWearAndEveryShopWriteReachInventoryThroughTheSameSanctionedPath` above.
         boolean sawSanctionedInventoryWriter = false;
         boolean sawSanctionedLoadoutWriter = false;
         for (Method method : CharacterDao.class.getDeclaredMethods()) {

@@ -95,7 +95,7 @@ public class BotFactory {
             1, 0,
             maxHp, maxMp, maxStamina, baseDef, baseAtk,
             stats,
-            new Inventory(new Array<>(), new Array<>(), new Array<>()),
+            new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
             loadout,
             new HashMap<>());
     }
@@ -127,9 +127,12 @@ public class BotFactory {
     private static final Skill LIGHTNING_BOLT = new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60, null, 0, null);
     private static final Skill METEOR = new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110, null, 0, null);
 
-    private static final Pet HOUND = new Pet(2L, "Hound", "", Tameness.STUBBORN, 35, 5, 10, 20);
-    private static final Pet WOLF = new Pet(3L, "Wolf", "", Tameness.TRACEABLE, 50, 8, 15, 25);
-    private static final Pet BEAR = new Pet(4L, "Bear", "", Tameness.LOYAL, 80, 15, 20, 36);
+    // Health (§18) is full on every bot pet, for the same reason durability is full on every bot weapon: a
+    // bot is synthesized fresh for one battle and has no inventory to wear down, so its pet must never
+    // start a fight already worn out and silently unable to act.
+    private static final Pet HOUND = new Pet(2L, "Hound", "", Tameness.STUBBORN, 35, 5, 10, 20, 35);
+    private static final Pet WOLF = new Pet(3L, "Wolf", "", Tameness.TRACEABLE, 50, 8, 15, 25, 50);
+    private static final Pet BEAR = new Pet(4L, "Bear", "", Tameness.LOYAL, 80, 15, 20, 36, 80);
 
     /**
      * The curated build shapes §7 calls for: a STR/Warhammer tank, an INT/Meteor nuker, and a SPD/DEX

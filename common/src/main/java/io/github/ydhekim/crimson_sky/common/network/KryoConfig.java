@@ -123,5 +123,18 @@ public class KryoConfig {
         kryo.register(LearnSkillNodeResponse.class, new RecordSerializer<>(LearnSkillNodeResponse.class));
         kryo.register(SaveLoadoutRequest.class, new RecordSerializer<>(SaveLoadoutRequest.class));
         kryo.register(SaveLoadoutResponse.class, new RecordSerializer<>(SaveLoadoutResponse.class));
+
+        // Shop (Epic O / system design §18) — weapon/pet repair and the two gold-only catalog purchases.
+        // Appended after SaveLoadoutResponse so every positional ID above is untouched (system design §5,
+        // append-only). Inventory's `consumables` map needs no registration of its own: Map/HashMap are
+        // already registered at the top, exactly as Character.skillTree relies on.
+        kryo.register(RepairWeaponRequest.class, new RecordSerializer<>(RepairWeaponRequest.class));
+        kryo.register(RepairWeaponResponse.class, new RecordSerializer<>(RepairWeaponResponse.class));
+        kryo.register(RepairPetRequest.class, new RecordSerializer<>(RepairPetRequest.class));
+        kryo.register(RepairPetResponse.class, new RecordSerializer<>(RepairPetResponse.class));
+        kryo.register(BuyScrollRequest.class, new RecordSerializer<>(BuyScrollRequest.class));
+        kryo.register(BuyScrollResponse.class, new RecordSerializer<>(BuyScrollResponse.class));
+        kryo.register(BuyResetTokenRequest.class, new RecordSerializer<>(BuyResetTokenRequest.class));
+        kryo.register(BuyResetTokenResponse.class, new RecordSerializer<>(BuyResetTokenResponse.class));
     }
 }

@@ -16,7 +16,8 @@ import java.util.SplittableRandom;
  * <p>One d100 gate roll vs {@code effectiveInsight = insight + tamenessModifier(pet)}; on success the
  * pet contributes {@code 1 + effectiveInsight/30} hits, each dealing {@code randomInt(minAttack,
  * maxAttack)} with <b>no</b> stat bonus (self-contained, §4.2). Returns {@code null} when the pet
- * does not act (roll failed, or no pet) — nothing is appended to the Result Set.
+ * does not act (roll failed, no pet, or a pet worn out to 0 health — §18) — nothing is appended to the
+ * Result Set.
  */
 public final class PetResolver {
 
@@ -31,11 +32,16 @@ public final class PetResolver {
 
     /**
      * Decision layer used by {@link BattleEngine} (carries the pet's damage range). {@code null} when
-     * the pet does not act. No gate roll is consumed when {@code pet == null} (no pet, nothing to roll).
+     * the pet does not act. No gate roll is consumed when {@code pet == null} (no pet, nothing to roll)
+     * or when the pet is out of health (§18) — a worn-out pet gets the same treatment as no pet at all,
+     * so it cannot perturb the shared RNG stream a healthy build would draw from.
      */
     static PetActionResolution choosePetAction(Stats stats, Pet pet, SplittableRandom rng) {
         if (pet == null) {
             return null;
+        }
+        if (!CombatMath.isPetUsable(pet)) {
+            return null; // worn out (§18): the bonus action is skipped, no gate roll consumed
         }
         int effectiveInsight = CombatMath.effectiveInsight(stats.insight(), pet);
         if (rng.nextInt(CombatMath.ROLL_BOUND) < effectiveInsight) {
