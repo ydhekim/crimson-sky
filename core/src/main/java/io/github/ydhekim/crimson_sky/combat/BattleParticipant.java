@@ -63,7 +63,7 @@ public class BattleParticipant {
      * Assembles a battle-ready participant from a persisted {@link Character}: base entity via
      * {@link CharacterMapper} (id/name/health/mana/stamina/stats/base-stats/loadout), then the
      * battle-only pouches (all loadout weapons in order, at their <i>inventory</i> durability; ACTIVE
-     * skills only, PASSIVE filtered out per §4.4; the first loadout pet with battle-scoped HP), the
+     * skills only, PASSIVE filtered out per §4.4; the first loadout pet at its <i>inventory</i> health), the
      * {@link PassiveModifiersComponent} derived from equipped PASSIVE skills (§16), and a zeroed
      * {@link BattleStateComponent}. The entity is added to {@code engine} so its lifecycle is owned there.
      *
@@ -81,6 +81,10 @@ public class BattleParticipant {
      * {@code currentDurability}. A weapon whose id isn't in inventory keeps its own value: defensive
      * (saveLoadout already enforces item ownership), and the case a bot legitimately hits — a synthesized
      * opponent has a loadout but an empty inventory.
+     *
+     * <p><b>Pet health comes from Inventory too (§18)</b>, for exactly the same reasons and through the
+     * same shape of cross-reference — pet wear was designed as durability's mirror, so it resolves the
+     * Loadout-vs-Inventory drift the same way rather than inventing a second answer.
      */
     public static BattleParticipant fromCharacter(Engine engine, Character character) {
         Entity entity = CharacterMapper.createEntity(engine, character);
@@ -108,9 +112,9 @@ public class BattleParticipant {
                 }
             }
             if (loadout.pets() != null && loadout.pets().size > 0) {
-                Pet pet = loadout.pets().first();
-                petSlot.equipped = pet;
-                petSlot.currentHealth = pet.healthPoint();
+                Pet crossReferenced = atInventoryPetHealth(loadout.pets().first(), character.inventory());
+                petSlot.equipped = crossReferenced;
+                petSlot.currentHealth = crossReferenced.currentHealth();
             }
 
             if (statsCmp != null && statsCmp.stats != null) {
@@ -143,6 +147,24 @@ public class BattleParticipant {
         for (Weapon owned : inventory.weapons()) {
             if (owned.id() == equipped.id()) {
                 return equipped.withCurrentDurability(owned.currentDurability());
+            }
+        }
+        return equipped;
+    }
+
+    /**
+     * {@code equipped} carrying the health its {@code inventory} counterpart (same id) currently has — the
+     * §18 source-of-truth cross-reference, identical in shape to {@link #atInventoryDurability} because pet
+     * health and weapon durability are deliberately the same mechanic. Falls back to {@code equipped}'s own
+     * value when the id isn't owned (a bot's synthesized loadout, per {@link #fromCharacter}).
+     */
+    private static Pet atInventoryPetHealth(Pet equipped, Inventory inventory) {
+        if (inventory == null || inventory.pets() == null) {
+            return equipped;
+        }
+        for (Pet owned : inventory.pets()) {
+            if (owned.id() == equipped.id()) {
+                return equipped.withCurrentHealth(owned.currentHealth());
             }
         }
         return equipped;

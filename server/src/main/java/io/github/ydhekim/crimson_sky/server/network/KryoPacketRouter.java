@@ -17,6 +17,7 @@ public class KryoPacketRouter implements PacketRouter {
                             AttackService attackService,
                             RewardService rewardService,
                             SkillTreeService skillTreeService,
+                            ShopService shopService,
                             LocalizationService localizationService,
                             AchievementService achievementService,
                             AccountService accountService) {
@@ -28,6 +29,10 @@ public class KryoPacketRouter implements PacketRouter {
         handlers.put(AllocateStatPointsRequest.class, new AllocateStatPointsRequestHandler(characterService));
         handlers.put(LearnSkillNodeRequest.class, new LearnSkillNodeRequestHandler(skillTreeService, characterService));
         handlers.put(SaveLoadoutRequest.class, new SaveLoadoutRequestHandler(characterService));
+        handlers.put(RepairWeaponRequest.class, new RepairWeaponRequestHandler(shopService, characterService));
+        handlers.put(RepairPetRequest.class, new RepairPetRequestHandler(shopService, characterService));
+        handlers.put(BuyScrollRequest.class, new BuyScrollRequestHandler(shopService, characterService));
+        handlers.put(BuyResetTokenRequest.class, new BuyResetTokenRequestHandler(shopService, characterService));
         handlers.put(LocalizationRequest.class, new LocalizationRequestHandler(localizationService));
         handlers.put(AchievementListRequest.class, new AchievementListRequestHandler(achievementService));
         handlers.put(SaveAccountSettingsRequest.class, new SaveAccountSettingsRequestHandler(accountService));

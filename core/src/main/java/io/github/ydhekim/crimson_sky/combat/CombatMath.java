@@ -97,4 +97,13 @@ public final class CombatMath {
     public static boolean isAffordable(Weapon weapon, int remainingStamina) {
         return weapon.currentDurability() > 0 && remainingStamina >= weapon.staminaCost();
     }
+
+    /**
+     * Pet-branch convenience: has this pet got any health left to act with? Mirrors the durability half of
+     * {@link #isAffordable(Weapon, int)} — a worn-out pet ({@code currentHealth == 0}) is skipped for the
+     * battle exactly as if the character brought no pet at all, never a block on attacking (§18).
+     */
+    public static boolean isPetUsable(Pet pet) {
+        return pet.currentHealth() > 0;
+    }
 }

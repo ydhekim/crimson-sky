@@ -5,6 +5,7 @@ import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.Rarity;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
@@ -16,6 +17,7 @@ import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import org.jdbi.v3.core.Jdbi;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
@@ -49,6 +51,11 @@ import java.util.Set;
  * {@code Inventory} is the single source of truth for durability and {@code updateInventory} is the single
  * sanctioned way to write it (C2). Nothing here reports a weapon that just broke; surfacing that is the
  * combat screen's job (M4), the same deferral the crit flag took.
+ *
+ * <p><b>Epic O adds the second cost, in the same shape</b> (system design §18): a pet that acted at all
+ * this battle loses a point of health. Deliberately not a new write path — it is another in-memory
+ * transformation of the same locked blob before the same {@code updateInventory} call, which is exactly
+ * the rule §18 set for every feature that mutates {@code inventory} from N2 onward.
  */
 public class RewardService {
 
@@ -157,9 +164,11 @@ public class RewardService {
             base.goldDelta(), base.expDelta(), base.eloDelta(),
             base.skillPointsGained(), levelsGained, statPointsGained, bonusRewardGranted);
 
-        // Durability (N2 / §17): which of the attacker's weapons fired at all this battle. Decided here,
-        // before any write, for the same reason the milestone roll is — the whole outcome is known first.
+        // Durability (N2 / §17) and pet health (O3 / §18): which of the attacker's items were used at all
+        // this battle. Decided here, before any write, for the same reason the milestone roll is — the whole
+        // outcome is known first.
         Set<Long> firedWeaponIds = firedWeaponIds(result);
+        Set<Long> firedPetIds = firedPetId(result);
 
         try {
             jdbi.useTransaction(handle -> {
@@ -178,8 +187,8 @@ public class RewardService {
                 // exception). Both transformations share the one read and the one write: §18 makes this
                 // explicit — every feature that mutates `inventory` from here on is a different in-memory
                 // transformation before the same `updateInventory` call, not a new write path.
-                if (!bonusWeapons.isEmpty() || !firedWeaponIds.isEmpty()) {
-                    updateInventory(characterDao, result.characterId(), firedWeaponIds, bonusWeapons);
+                if (!bonusWeapons.isEmpty() || !firedWeaponIds.isEmpty() || !firedPetIds.isEmpty()) {
+                    updateInventory(characterDao, result.characterId(), firedWeaponIds, firedPetIds, bonusWeapons);
                 }
             });
         } catch (Exception e) {
@@ -243,8 +252,8 @@ public class RewardService {
     }
 
     /**
-     * The attacker's stored inventory, read under the row lock, transformed by both of this battle's
-     * effects, and written back once (§15's item grant + §17's durability wear).
+     * The attacker's stored inventory, read under the row lock, transformed by all of this battle's
+     * effects, and written back once (§15's item grant, §17's durability wear, §18's pet-health wear).
      *
      * <p>Order is deliberate: existing weapons wear <b>before</b> the grant appends, so a weapon handed
      * out as this battle's milestone bonus is never charged durability for a battle it wasn't carried in.
@@ -253,16 +262,17 @@ public class RewardService {
      * the null form (creation stores {@code new Inventory(null, null, null)}), so the grant is still the
      * first code to write a real array and must not NPE on the existing shape.
      *
-     * <p>Writes nothing at all if neither transformation changed anything — a battle whose only weapon
+     * <p>Writes nothing at all if no transformation changed anything — a battle whose only weapon
      * was already broken (0 durability, so {@link Weapon#worn()} is a no-op) leaves the column untouched
      * rather than rewriting it identically. C2's rule is that a battle touches stored items only when it
      * genuinely has something to record.
      */
-    private void updateInventory(CharacterDao characterDao, long characterId,
-                                 Set<Long> firedWeaponIds, List<Weapon> bonusWeapons) {
+    private void updateInventory(CharacterDao characterDao, long characterId, Set<Long> firedWeaponIds,
+                                 Set<Long> firedPetIds, List<Weapon> bonusWeapons) {
         Inventory inventory = characterDao.getInventoryForUpdate(characterId)
-            .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>()));
+            .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()));
         Array<Weapon> weapons = inventory.weapons() != null ? inventory.weapons() : new Array<>();
+        Array<Pet> pets = inventory.pets() != null ? inventory.pets() : new Array<>();
 
         boolean changed = false;
         for (int i = 0; i < weapons.size; i++) {
@@ -272,15 +282,47 @@ public class RewardService {
                 changed = true;
             }
         }
+        for (int i = 0; i < pets.size; i++) {
+            Pet pet = pets.get(i);
+            if (firedPetIds.contains(pet.id()) && pet.currentHealth() > 0) {
+                pets.set(i, pet.worn()); // −1, floored at 0 by Pet.worn()
+                changed = true;
+            }
+        }
         for (Weapon weapon : bonusWeapons) {
             weapons.add(weapon);
             changed = true;
         }
 
         if (changed) {
+            // The shop's consumables ride through untouched: a battle never mutates them (§18).
             characterDao.updateInventory(characterId,
-                new Inventory(weapons, inventory.skills(), inventory.pets()));
+                new Inventory(weapons, inventory.skills(), pets, inventory.consumables()));
         }
+    }
+
+    /**
+     * The attacker's equipped pet's id if it acted at least once this battle (§18) — the pet mirror of
+     * {@link #firedWeaponIds}, and a set for the same reason: a pet wears by 1 per <b>battle</b>, not per
+     * hit, so acting three times in a long fight still costs one point. At most one id in practice, since a
+     * character carries a single pet; the set shape is what makes the "however many times" rule automatic.
+     *
+     * <p>{@code result.turns()} is the attacker's own turn history — never the opponent's — so this can
+     * only ever wear the pet of the character being rewarded.
+     */
+    static Set<Long> firedPetId(AttackResult result) {
+        Set<Long> ids = new LinkedHashSet<>();
+        if (result.turns() == null) {
+            return ids;
+        }
+        for (Array<ResolvedAction> turn : result.turns()) {
+            for (ResolvedAction action : turn) {
+                if (action.source() == ActionSource.PET && action.itemId() != 0L) {
+                    ids.add(action.itemId());
+                }
+            }
+        }
+        return ids;
     }
 
     /**

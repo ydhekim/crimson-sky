@@ -57,7 +57,7 @@ public final class CombatFixtures {
             id, accountId, name, Faction.A, 1, 0,
             1 /* maxHp */, 10 /* maxMp */, 10 /* maxStamina */, 0, 0,
             stats,
-            new Inventory(new Array<>(), new Array<>(), new Array<>()),
+            new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
             new Loadout(new Array<Weapon>(), new Array<Skill>(), new Array<Pet>()),
             new HashMap<>());
     }
@@ -74,6 +74,31 @@ public final class CombatFixtures {
             base.stats(), base.inventory(), base.loadout(), base.skillTree());
     }
 
+    /**
+     * {@link #character}, plus {@code pet} equipped <b>and</b> owned — the §18 pet-wear fixture. The pet
+     * sits in both {@code Inventory} and {@code Loadout} because that is the only shape a real character
+     * can have (saveLoadout rejects an unowned item), and because combat reads its health from the
+     * inventory copy.
+     *
+     * <p>{@code insight} is the one dial: {@code insight + tamenessModifier(pet)} decides the pet's gate
+     * roll, so a caller picks a value that makes the pet certain to act (> 100) or certain not to (< 0),
+     * keeping "did the pet act" a fact of the fixture rather than of the seed.
+     */
+    public static Character characterWithPet(long id, long accountId, String name, Pet pet, int insight) {
+        Character base = character(id, accountId, name);
+        Stats s = base.stats();
+        Stats stats = new Stats(s.strength(), s.dexterity(), s.vitality(), s.intelligence(),
+            s.wisdom(), s.spirit(), s.speed(), insight);
+
+        return new Character(
+            base.id(), base.accountId(), base.name(), base.faction(), base.level(), base.experience(),
+            base.maxHp(), base.maxMp(), base.maxStamina(), base.baseDef(), base.baseAtk(),
+            stats,
+            new Inventory(new Array<>(), new Array<>(), Array.with(pet), new HashMap<>()),
+            new Loadout(Array.with(flatWeapon()), new Array<Skill>(), Array.with(pet)),
+            new HashMap<>());
+    }
+
     /** A character guaranteed to land exactly one 150-damage weapon hit per turn. */
     public static Character character(long id, long accountId, String name) {
         Stats stats = new Stats(
@@ -88,7 +113,7 @@ public final class CombatFixtures {
             500 /* maxHp */, 100 /* maxMp */, 100 /* maxStamina */,
             0 /* baseDef → full damage lands */, 0 /* baseAtk */,
             stats,
-            new Inventory(new Array<>(), new Array<>(), new Array<>()),
+            new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
             new Loadout(Array.with(flatWeapon()), new Array<Skill>(), new Array<Pet>()),
             new HashMap<>());
     }

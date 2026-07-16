@@ -40,7 +40,7 @@ class BattleParticipantDurabilityTest {
     private static Character character(Array<Weapon> owned, Array<Weapon> equipped) {
         return new Character(1L, 1L, "Ayla", Faction.A, 1, 0, 100, 100, 100, 0, 0,
             new Stats(100, 0, 10, 10, 10, 10, 0, 0),
-            new Inventory(owned, new Array<>(), new Array<>()),
+            new Inventory(owned, new Array<>(), new Array<>(), new HashMap<>()),
             new Loadout(equipped, new Array<Skill>(), new Array<Pet>()),
             new HashMap<>());
     }

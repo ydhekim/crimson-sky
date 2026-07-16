@@ -217,7 +217,7 @@ class PouchResolutionTest {
 
         // LOYAL Bear (+20) with Insight 90 → effectiveInsight 110 > 100 → the pet always acts,
         // proving the Insight check runs regardless of the character's Burned outcome.
-        Pet bear = new Pet(1L, "Bear", "", Tameness.LOYAL, 80, 15, 20, 36);
+        Pet bear = new Pet(1L, "Bear", "", Tameness.LOYAL, 80, 15, 20, 36, 80);
         ResolvedAction pet = PetResolver.resolvePetAction(stats, bear, rng);
 
         assertNotNull(pet, "pet must still act after a Burned cast");

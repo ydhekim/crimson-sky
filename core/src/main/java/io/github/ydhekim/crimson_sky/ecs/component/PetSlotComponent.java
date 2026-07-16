@@ -9,6 +9,11 @@ import io.github.ydhekim.crimson_sky.common.model.Pet;
  * pet's battle-scoped HP, kept separate from the immutable {@link Pet} record so damage to the pet
  * never mutates persisted data. Absent/{@code null} {@code equipped} means a pet-less build. Read by
  * {@link io.github.ydhekim.crimson_sky.ecs.system.PetResolutionSystem}.
+ *
+ * <p><b>Seeded from persisted health since §18</b>, not from {@code healthPoint()}: a pet now wears by 1
+ * per battle it acts in, and {@code Inventory} holds that count. Nothing in combat decrements this copy —
+ * a pets-can-be-hurt-by-the-opponent mechanic remains explicitly out of scope (§18) — so what changed is
+ * only where the starting value comes from, never who writes it mid-battle.
  */
 public class PetSlotComponent implements Component, Poolable {
     public Pet equipped;

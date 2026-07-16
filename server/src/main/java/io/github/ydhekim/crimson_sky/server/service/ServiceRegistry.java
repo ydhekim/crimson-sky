@@ -10,6 +10,7 @@ public class ServiceRegistry {
     private final AttackService attackService;
     private final RewardService rewardService;
     private final SkillTreeService skillTreeService;
+    private final ShopService shopService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -31,6 +32,10 @@ public class ServiceRegistry {
         // Same reason as RewardService: a learn/upgrade spans `characters` (skill points, skill tree,
         // inventory) and `accounts` (gold) atomically, so it needs the raw Jdbi, not onDemand proxies.
         this.skillTreeService = new SkillTreeService(dbManager.getJdbi(), characterService);
+
+        // Same reason again: a repair or purchase spans `characters` (inventory) and `accounts` (gold)
+        // atomically, so it needs the raw Jdbi, not onDemand proxies.
+        this.shopService = new ShopService(dbManager.getJdbi(), characterService);
 
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
@@ -60,6 +65,10 @@ public class ServiceRegistry {
 
     public SkillTreeService getSkillTreeService() {
         return skillTreeService;
+    }
+
+    public ShopService getShopService() {
+        return shopService;
     }
 
     public LocalizationService getLocalizationService() {

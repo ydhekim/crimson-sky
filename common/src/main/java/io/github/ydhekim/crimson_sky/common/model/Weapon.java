@@ -43,4 +43,10 @@ public record Weapon(
         return new Weapon(id, name, description, rarity, weight, minAttack, maxAttack, staminaCost,
             maxDurability, durability);
     }
+
+    /** A copy fully restored to {@code maxDurability} — the shop repair action (§18). */
+    public Weapon repaired() {
+        return new Weapon(id, name, description, rarity, weight, minAttack, maxAttack, staminaCost,
+            maxDurability, maxDurability);
+    }
 }
