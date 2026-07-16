@@ -198,7 +198,8 @@ public class BattleEngine {
                 break; // per-hit win condition: skip the rest of this entry
             }
         }
-        return new ResolvedAction(entry.source(), entry.label(), entry.frequency(), entry.failed(), total);
+        return new ResolvedAction(entry.source(), entry.label(), entry.frequency(), entry.failed(),
+            total, entry.itemId());
     }
 
     /** Draws the committed action's cost from the matching pool and mirrors it onto Battle State. */

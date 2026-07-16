@@ -10,10 +10,12 @@ import com.badlogic.gdx.utils.Pool.Poolable;
  * held here; they fold directly into {@code StatsComponent} at the same boundary. This component only
  * carries the flat, non-stat knobs the damage/evasion math consumes.
  *
- * <p>{@code dodgeChanceBonus}/{@code critChanceBonus} are the two wired into combat this pass (§0/§14).
- * {@code resourceCostReduction} and {@code weightCapacityBonus} are populated by no v1.0 tree node and
- * read by no combat code yet — carried for forward compatibility with the resource economy / weight-cap
- * epics, exactly like their {@code PassiveEffectType} values.
+ * <p>{@code dodgeChanceBonus}/{@code critChanceBonus} are the two the in-battle math reads (§0/§14).
+ * {@code weightCapacityBonus} is enforced <b>outside</b> a battle — {@code CharacterService.saveLoadout}
+ * gates on it at loadout-save time (§17) via the same {@code PassiveEffects} aggregation that fills this
+ * component, so no combat code reads the field; it is carried here to keep the component a complete
+ * picture of what's equipped. {@code resourceCostReduction} is populated by no v1.0 tree node and read by
+ * nothing yet — forward compatibility with the resource-economy epic, like its {@code PassiveEffectType}.
  */
 public class PassiveModifiersComponent implements Component, Poolable {
     public int dodgeChanceBonus;

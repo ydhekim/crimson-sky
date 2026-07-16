@@ -20,9 +20,10 @@ import java.util.SplittableRandom;
  * <ol>
  *   <li><b>Weapon branch</b> — if the weapon pouch is non-empty, one d100 gate roll vs
  *       {@code effectiveStrength(str, pouch[0].weight)} (slot 0's weight always gates, §4.4). On
- *       success, walk the pouch by <b>Stamina affordability only</b> ({@code remainingStamina >=
- *       staminaCost}, no re-rolling) and use the first affordable weapon; frequency is
- *       {@code 1 + dexterity/30} (raw DEX). If none affordable, fall through to the skill branch.</li>
+ *       success, walk the pouch by <b>affordability only</b> ({@link CombatMath#isAffordable(Weapon,int)}
+ *       — Stamina left, and not broken at 0 durability per §17; no re-rolling) and use the first
+ *       affordable weapon; frequency is {@code 1 + dexterity/30} (raw DEX). If none affordable, fall
+ *       through to the skill branch.</li>
  *   <li><b>Skill branch</b> — same shape: one gate roll vs slot 0's {@code effectiveWis}, then walk
  *       by <b>Mana affordability</b> ({@code currentMana >= manaCost}). Frequency uses the
  *       <i>selected</i> skill's {@code effectiveWis}. If none affordable → <b>Burned</b> cast on
@@ -99,7 +100,8 @@ public final class ActionResolver {
             Weapon chosen = firstAffordableWeapon(weapons, remainingStamina);
             if (chosen != null) {
                 ResolvedAction action = new ResolvedAction(
-                    ActionSource.WEAPON, chosen.name(), CombatMath.frequency(stats.dexterity()), false);
+                    ActionSource.WEAPON, chosen.name(), CombatMath.frequency(stats.dexterity()), false,
+                    chosen.id());
                 return new CharacterActionResolution(
                     action, chosen.minAttack(), chosen.maxAttack(), stats.strength(), chosen.staminaCost());
             }
@@ -113,21 +115,23 @@ public final class ActionResolver {
             if (chosen != null) {
                 int freq = CombatMath.frequency(
                     CombatMath.effectiveWis(stats.wisdom(), chosen.difficultyToAct()));
-                ResolvedAction action = new ResolvedAction(ActionSource.SKILL, chosen.name(), freq, false);
+                ResolvedAction action = new ResolvedAction(
+                    ActionSource.SKILL, chosen.name(), freq, false, chosen.id());
                 return new CharacterActionResolution(
                     action, chosen.minAttack(), chosen.maxAttack(), stats.intelligence(), chosen.manaCost());
             }
             // None affordable → Burned cast on slot 0 (single event, no damage applied, nothing spent).
-            ResolvedAction burned = new ResolvedAction(ActionSource.SKILL, FAILED_CAST_LABEL, 1, true);
+            // No item id: nothing was acted with, so there is nothing for §17's bookkeeping to charge.
+            ResolvedAction burned = new ResolvedAction(ActionSource.SKILL, FAILED_CAST_LABEL, 1, true, 0L);
             return new CharacterActionResolution(burned, 0, 0, 0, 0);
         }
 
-        // Step 3 — Punch fallback: always available, 0 cost.
-        ResolvedAction punch = new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false);
+        // Step 3 — Punch fallback: always available, 0 cost. No backing record → no item id.
+        ResolvedAction punch = new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false, 0L);
         return new CharacterActionResolution(punch, PUNCH_MIN, PUNCH_MAX, stats.strength(), 0);
     }
 
-    /** First weapon in priority order the character can still afford from Stamina, or {@code null}. */
+    /** First weapon in priority order the character can still draw (Stamina + durability), or {@code null}. */
     private static Weapon firstAffordableWeapon(Array<Weapon> weapons, int remainingStamina) {
         for (Weapon weapon : weapons) {
             if (CombatMath.isAffordable(weapon, remainingStamina)) {

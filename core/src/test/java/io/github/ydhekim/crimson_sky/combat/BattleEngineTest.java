@@ -50,7 +50,7 @@ class BattleEngineTest {
 
         // A one-shot weapon: 100–100 base + STR bonus, vs the defender's 0 defence and 10 HP.
         Weapon crusher = new Weapon(1L, "Crusher", "", Rarity.RARE, 2f /* light → no STR penalty */,
-            100, 100, 5);
+            100, 100, 5, 20, 20 /* full durability → never skipped as broken (§17) */);
 
         // Attacker is faster (90 vs 0) → acts first. Defender is frail (10 HP) and slow (speed 0 →
         // 0% dodge), so the attacker's single weapon hit is lethal within its own Result Set.

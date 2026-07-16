@@ -4,6 +4,8 @@ import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import io.github.ydhekim.crimson_sky.common.model.Character;
+import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.Skill;
 import io.github.ydhekim.crimson_sky.common.model.SkillType;
@@ -60,16 +62,25 @@ public class BattleParticipant {
     /**
      * Assembles a battle-ready participant from a persisted {@link Character}: base entity via
      * {@link CharacterMapper} (id/name/health/mana/stamina/stats/base-stats/loadout), then the
-     * battle-only pouches (all loadout weapons in order; ACTIVE skills only, PASSIVE filtered out per
-     * §4.4; the first loadout pet with battle-scoped HP), the {@link PassiveModifiersComponent} derived
-     * from equipped PASSIVE skills (§16), and a zeroed {@link BattleStateComponent}. The entity is added
-     * to {@code engine} so its lifecycle is owned there.
+     * battle-only pouches (all loadout weapons in order, at their <i>inventory</i> durability; ACTIVE
+     * skills only, PASSIVE filtered out per §4.4; the first loadout pet with battle-scoped HP), the
+     * {@link PassiveModifiersComponent} derived from equipped PASSIVE skills (§16), and a zeroed
+     * {@link BattleStateComponent}. The entity is added to {@code engine} so its lifecycle is owned there.
      *
      * <p><b>Passive derivation (§16), the single per-battle translation boundary:</b> equipped
-     * {@code PASSIVE} skills are read once here. A {@code STAT_BONUS} passive folds its (already
-     * rank-scaled) {@code passiveMagnitude} straight into the {@link StatsComponent}'s named stat; every
-     * other effect type accumulates into the matching {@link PassiveModifiersComponent} field. {@code
-     * ACTIVE} skills are untouched by this — they still populate the priority pouch as before.
+     * {@code PASSIVE} skills are read once here, via {@link PassiveEffects} — the same pure aggregation
+     * {@code CharacterService.saveLoadout} runs for §17's weight gate, so the two can never compute a
+     * different bonus for the same character. A {@code STAT_BONUS} passive folds into the
+     * {@link StatsComponent}'s named stat; the flat knobs land on {@link PassiveModifiersComponent}.
+     * {@code ACTIVE} skills are untouched by this — they still populate the priority pouch as before.
+     *
+     * <p><b>Durability comes from Inventory, never Loadout (§17):</b> both records hold their own copy of
+     * an equipped weapon, and {@code saveLoadout} lets a client submit its own copy at any time, so the
+     * two can drift — and the post-battle decrement only ever writes inventory. Each equipped weapon is
+     * therefore cross-referenced by id against {@code character.inventory()} and takes <i>that</i> copy's
+     * {@code currentDurability}. A weapon whose id isn't in inventory keeps its own value: defensive
+     * (saveLoadout already enforces item ownership), and the case a bot legitimately hits — a synthesized
+     * opponent has a loadout but an empty inventory.
      */
     public static BattleParticipant fromCharacter(Engine engine, Character character) {
         Entity entity = CharacterMapper.createEntity(engine, character);
@@ -82,25 +93,33 @@ public class BattleParticipant {
 
         LoadoutComponent loadoutCmp = entity.getComponent(LoadoutComponent.class);
         if (loadoutCmp != null && loadoutCmp.loadout != null) {
-            if (loadoutCmp.loadout.weapons() != null) {
-                for (Weapon weapon : loadoutCmp.loadout.weapons()) {
-                    weaponSlot.equipped.add(weapon);
+            Loadout loadout = loadoutCmp.loadout;
+
+            if (loadout.weapons() != null) {
+                for (Weapon weapon : loadout.weapons()) {
+                    weaponSlot.equipped.add(atInventoryDurability(weapon, character.inventory()));
                 }
             }
-            if (loadoutCmp.loadout.skills() != null) {
-                for (Skill skill : loadoutCmp.loadout.skills()) {
+            if (loadout.skills() != null) {
+                for (Skill skill : loadout.skills()) {
                     if (skill.type() == SkillType.ACTIVE) { // passives never enter the priority pouch
                         skillSlot.equipped.add(skill);
-                    } else if (skill.type() == SkillType.PASSIVE) {
-                        applyPassive(skill, passiveModifiers, statsCmp);
                     }
                 }
             }
-            if (loadoutCmp.loadout.pets() != null && loadoutCmp.loadout.pets().size > 0) {
-                Pet pet = loadoutCmp.loadout.pets().first();
+            if (loadout.pets() != null && loadout.pets().size > 0) {
+                Pet pet = loadout.pets().first();
                 petSlot.equipped = pet;
                 petSlot.currentHealth = pet.healthPoint();
             }
+
+            if (statsCmp != null && statsCmp.stats != null) {
+                statsCmp.stats = PassiveEffects.applyStatBonuses(statsCmp.stats, loadout);
+            }
+            passiveModifiers.dodgeChanceBonus = PassiveEffects.totalDodgeChanceBonus(loadout);
+            passiveModifiers.critChanceBonus = PassiveEffects.totalCritChanceBonus(loadout);
+            passiveModifiers.resourceCostReduction = PassiveEffects.totalResourceCostReduction(loadout);
+            passiveModifiers.weightCapacityBonus = PassiveEffects.totalWeightCapacityBonus(loadout);
         }
         entity.add(weaponSlot);
         entity.add(skillSlot);
@@ -113,26 +132,20 @@ public class BattleParticipant {
     }
 
     /**
-     * Folds one equipped {@code PASSIVE} skill into the battle-scoped modifiers (§16). {@code STAT_BONUS}
-     * adds to the named stat on {@code statsCmp}; the flat-knob effects accumulate onto
-     * {@code passiveModifiers}. {@code passiveMagnitude} is already the full rank-scaled value (see
-     * {@link Skill}), so this is a plain sum with no rank arithmetic.
+     * {@code equipped} carrying the durability its {@code inventory} counterpart (same id) currently has —
+     * the §17 source-of-truth cross-reference. Falls back to {@code equipped}'s own value when the id
+     * isn't owned (see {@link #fromCharacter}).
      */
-    private static void applyPassive(Skill skill, PassiveModifiersComponent passiveModifiers, StatsComponent statsCmp) {
-        if (skill.passiveEffect() == null) {
-            return; // malformed passive (no effect) — nothing to fold
+    private static Weapon atInventoryDurability(Weapon equipped, Inventory inventory) {
+        if (inventory == null || inventory.weapons() == null) {
+            return equipped;
         }
-        switch (skill.passiveEffect()) {
-            case STAT_BONUS -> {
-                if (skill.passiveTargetStat() != null && statsCmp != null && statsCmp.stats != null) {
-                    statsCmp.stats = statsCmp.stats.plus(skill.passiveTargetStat(), skill.passiveMagnitude());
-                }
+        for (Weapon owned : inventory.weapons()) {
+            if (owned.id() == equipped.id()) {
+                return equipped.withCurrentDurability(owned.currentDurability());
             }
-            case DODGE_CHANCE_BONUS -> passiveModifiers.dodgeChanceBonus += skill.passiveMagnitude();
-            case CRIT_CHANCE_BONUS -> passiveModifiers.critChanceBonus += skill.passiveMagnitude();
-            case RESOURCE_COST_REDUCTION -> passiveModifiers.resourceCostReduction += skill.passiveMagnitude();
-            case WEIGHT_CAPACITY_BONUS -> passiveModifiers.weightCapacityBonus += skill.passiveMagnitude();
         }
+        return equipped;
     }
 
     public Entity entity() {

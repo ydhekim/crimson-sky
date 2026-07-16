@@ -43,7 +43,7 @@ class SaveLoadoutRequestHandlerTest {
     private static final long CHARACTER_A = 1L;
     private static final long CHARACTER_B = 2L;
 
-    private static final Weapon SWORD = new Weapon(1L, "Sword", "", Rarity.COMMON, 2f, 10, 20, 5);
+    private static final Weapon SWORD = new Weapon(1L, "Sword", "", Rarity.COMMON, 2f, 10, 20, 5, 20, 20);
     private static final Skill IRON_GRIP = new Skill(1000L, "Iron Grip", "", SkillType.PASSIVE, 0,
         Difficulty.EASY, 0, 0, PassiveEffectType.STAT_BONUS, 2, StatName.STRENGTH);
 
@@ -95,7 +95,7 @@ class SaveLoadoutRequestHandlerTest {
         seed(CHARACTER_A, ACCOUNT_A);
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        Weapon notOwned = new Weapon(99L, "Excalibur", "", Rarity.RARE, 2f, 50, 60, 5);
+        Weapon notOwned = new Weapon(99L, "Excalibur", "", Rarity.RARE, 2f, 50, 60, 5, 20, 20);
         handler().handle(connection, new SaveLoadoutRequest(CHARACTER_A,
             new Loadout(Array.with(notOwned), new Array<>(), new Array<>())));
 

@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.combat.PassiveEffects;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Loadout;
@@ -221,15 +222,16 @@ public class CharacterService {
     /** The shared active+passive skill-slot cap (system design §16). */
     public static final int MAX_LOADOUT_SKILLS = 5;
 
+    /** Weapon-carry capacity per point of STR (system design §17): {@code maxCarryWeight = STR × 3 + bonus}. */
+    public static final int CARRY_WEIGHT_PER_STRENGTH = 3;
+
     /**
-     * Replaces a character's equipped {@link Loadout} (system design §4.4/§16). Validates, in order:
+     * Replaces a character's equipped {@link Loadout} (system design §4.4/§16/§17). Validates, in order:
      * ownership (fail closed); that the combined skill slots (ACTIVE + PASSIVE share one pool) do not
-     * exceed {@link #MAX_LOADOUT_SKILLS}; and that every weapon/skill/pet id referenced in the submitted
-     * loadout exists in the character's current inventory — the ownership-of-items rule §4.4 always
-     * implied but never enforced in code. On success writes the whole loadout unconditionally.
-     *
-     * <p><b>Weight capacity is intentionally not enforced this pass</b> — Epic N doesn't exist yet, so a
-     * loadout that would fail N1's future weight gate saves successfully today.
+     * exceed {@link #MAX_LOADOUT_SKILLS}; that the equipped weapons fit the character's carry capacity
+     * (§17, see {@link #exceedsCarryWeight}); and that every weapon/skill/pet id referenced in the
+     * submitted loadout exists in the character's current inventory — the ownership-of-items rule §4.4
+     * always implied but never enforced in code. On success writes the whole loadout unconditionally.
      */
     public ServiceResult<Loadout> saveLoadout(long accountId, long characterId, Loadout loadout) {
         try {
@@ -252,6 +254,13 @@ public class CharacterService {
                 return ServiceResult.failure(MessageCode.LOADOUT_SKILL_SLOTS_EXCEEDED);
             }
 
+            int maxCarryWeight = maxCarryWeight(entity.get().stats(), submitted);
+            if (exceedsCarryWeight(submitted, maxCarryWeight)) {
+                log.info("Loadout save rejected for character " + characterId + ": weapons weighing "
+                    + totalWeaponWeight(submitted) + " exceed the carry capacity of " + maxCarryWeight + ".");
+                return ServiceResult.failure(MessageCode.LOADOUT_WEIGHT_EXCEEDED);
+            }
+
             Inventory inventory = entity.get().inventory();
             if (!ownsAllItems(inventory, submitted)) {
                 log.info("Loadout save rejected for character " + characterId
@@ -266,6 +275,43 @@ public class CharacterService {
             log.error("Exception during loadout save for character " + characterId, e);
             return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
         }
+    }
+
+    /**
+     * The character's total weapon-carry budget (system design §17): {@code STR × 3}, plus the flat bonus
+     * from any {@code WEIGHT_CAPACITY_BONUS} passive equipped <b>in the submitted loadout</b> — the
+     * loadout being saved is the one that will be carried, so its own passives are what fund it.
+     *
+     * <p>The bonus term goes through {@link PassiveEffects}, the same pure aggregation
+     * {@code BattleParticipant.fromCharacter} folds into {@code PassiveModifiersComponent} at battle
+     * setup. One formula, one implementation: the capacity that admits a loadout here and the one combat
+     * plays with cannot drift apart.
+     */
+    private int maxCarryWeight(Stats stats, Loadout loadout) {
+        return stats.strength() * CARRY_WEIGHT_PER_STRENGTH + PassiveEffects.totalWeightCapacityBonus(loadout);
+    }
+
+    /**
+     * The §17 hard gate: do the equipped weapons together outweigh {@code maxCarryWeight}? Weapons only —
+     * skills and pets have no weight dimension in the data model.
+     *
+     * <p>This is layered on top of, not a replacement for, §4.3's soft per-item {@code comfortableWeight}
+     * penalty in {@code CombatMath.effectiveStrength}: that one still separately reduces the draw roll for
+     * an individual weapon heavy relative to STR, even when the pouch fits inside this total budget.
+     */
+    private boolean exceedsCarryWeight(Loadout loadout, int maxCarryWeight) {
+        return totalWeaponWeight(loadout) > maxCarryWeight;
+    }
+
+    private float totalWeaponWeight(Loadout loadout) {
+        if (loadout.weapons() == null) {
+            return 0f;
+        }
+        float total = 0f;
+        for (Weapon weapon : loadout.weapons()) {
+            total += weapon.weight();
+        }
+        return total;
     }
 
     /** True only when every weapon/skill/pet in {@code loadout} is present (by id) in {@code inventory}. */

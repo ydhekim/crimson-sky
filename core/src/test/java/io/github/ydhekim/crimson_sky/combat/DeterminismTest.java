@@ -38,7 +38,7 @@ class DeterminismTest {
     }
 
     private static Weapon sampleWeapon() {
-        return new Weapon(1L, "Hammer", "A heavy hammer", Rarity.COMMON, 5.0f, 30, 40, 8);
+        return new Weapon(1L, "Hammer", "A heavy hammer", Rarity.COMMON, 5.0f, 30, 40, 8, 20, 20);
     }
 
     private static Skill sampleSkill() {

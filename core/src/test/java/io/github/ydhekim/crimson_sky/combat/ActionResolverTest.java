@@ -41,8 +41,10 @@ class ActionResolverTest {
     // New record shapes (Weapon: min/max/staminaCost; Skill: min/max). Weight stays low (5) so the
     // weapon-draw roll reads effectiveStrength == raw STR for these fixtures, and the single-item
     // overload treats Stamina as unlimited — so every A1 scenario/assertion below is unchanged.
+    // Durability is full (20/20, §17): a weapon at 0 is unaffordable and would silently drop these
+    // scenarios to Punch — the arity change must not quietly rewrite what they assert.
     private static Weapon weapon(String name) {
-        return new Weapon(1L, name, name + " description", Rarity.COMMON, 5.0f, 30, 40, 8);
+        return new Weapon(1L, name, name + " description", Rarity.COMMON, 5.0f, 30, 40, 8, 20, 20);
     }
 
     private static Skill skill(String name, int manaCost) {
@@ -61,7 +63,7 @@ class ActionResolverTest {
             stats, weapon("Hammer"), null, 100, rng);
 
         // Weapon draw succeeds (roll 31 < STR 70); frequency 1 + 60/30 = 3.
-        assertEquals(new ResolvedAction(ActionSource.WEAPON, "Hammer", 3, false), action);
+        assertEquals(new ResolvedAction(ActionSource.WEAPON, "Hammer", 3, false, 1L), action);
     }
 
     @Test
@@ -74,7 +76,7 @@ class ActionResolverTest {
             stats, null, skill("Lightning", 20), 100, rng);
 
         // No weapon → skill cast; roll 31 < WIS 80, mana ok; frequency 1 + 80/30 = 3.
-        assertEquals(new ResolvedAction(ActionSource.SKILL, "Lightning", 3, false), action);
+        assertEquals(new ResolvedAction(ActionSource.SKILL, "Lightning", 3, false, 1L), action);
     }
 
     @Test
@@ -88,8 +90,9 @@ class ActionResolverTest {
 
         // Skill cast succeeds (roll 31 < WIS 80) but mana validation fails → Burned.
         assertEquals(
-            new ResolvedAction(ActionSource.SKILL, ActionResolver.FAILED_CAST_LABEL, 1, true), action);
+            new ResolvedAction(ActionSource.SKILL, ActionResolver.FAILED_CAST_LABEL, 1, true, 0L), action);
         assertTrue(action.failed(), "a Burned cast must read as a failure, not a no-op");
+        assertEquals(0L, action.itemId(), "nothing was cast, so no item id is charged (§17)");
     }
 
     // --- cascade edge cases -------------------------------------------------------------------
@@ -103,7 +106,7 @@ class ActionResolverTest {
         ResolvedAction action = ActionResolver.resolveCharacterAction(
             stats, weapon("Hammer"), skill("Fireball", 10), 100, rng);
 
-        assertEquals(new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false), action);
+        assertEquals(new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false, 0L), action);
     }
 
     @Test
@@ -116,6 +119,6 @@ class ActionResolverTest {
             stats, null, skill("Heal", 30), 30, rng);
 
         assertFalse(action.failed(), "mana equal to cost must not burn the cast");
-        assertEquals(new ResolvedAction(ActionSource.SKILL, "Heal", 4, false), action);
+        assertEquals(new ResolvedAction(ActionSource.SKILL, "Heal", 4, false, 1L), action);
     }
 }

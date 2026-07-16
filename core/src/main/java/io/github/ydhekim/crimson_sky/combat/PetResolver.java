@@ -40,7 +40,7 @@ public final class PetResolver {
         int effectiveInsight = CombatMath.effectiveInsight(stats.insight(), pet);
         if (rng.nextInt(CombatMath.ROLL_BOUND) < effectiveInsight) {
             ResolvedAction action = new ResolvedAction(
-                ActionSource.PET, pet.name(), CombatMath.frequency(effectiveInsight), false);
+                ActionSource.PET, pet.name(), CombatMath.frequency(effectiveInsight), false, pet.id());
             return new PetActionResolution(action, pet.minAttack(), pet.maxAttack());
         }
         return null;
