@@ -14,6 +14,7 @@ import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.model.Tameness;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -95,7 +96,8 @@ public class BotFactory {
             maxHp, maxMp, maxStamina, baseDef, baseAtk,
             stats,
             new Inventory(new Array<>(), new Array<>(), new Array<>()),
-            loadout);
+            loadout,
+            new HashMap<>());
     }
 
     /**
@@ -118,9 +120,10 @@ public class BotFactory {
     private static final Weapon STEEL_LONGSWORD = new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15);
     private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25);
 
-    private static final Skill SPARK = new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40);
-    private static final Skill LIGHTNING_BOLT = new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60);
-    private static final Skill METEOR = new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110);
+    // ACTIVE skills leave the three trailing passive fields empty (null, 0, null), per §16's Skill shape.
+    private static final Skill SPARK = new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40, null, 0, null);
+    private static final Skill LIGHTNING_BOLT = new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60, null, 0, null);
+    private static final Skill METEOR = new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110, null, 0, null);
 
     private static final Pet HOUND = new Pet(2L, "Hound", "", Tameness.STUBBORN, 35, 5, 10, 20);
     private static final Pet WOLF = new Pet(3L, "Wolf", "", Tameness.TRACEABLE, 50, 8, 15, 25);

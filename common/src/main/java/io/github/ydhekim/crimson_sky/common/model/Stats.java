@@ -42,6 +42,24 @@ public record Stats(
             insight + other.insight);
     }
 
+    /**
+     * Returns a copy with {@code amount} added to the single component named by {@code stat} (system
+     * design §16). Used to fold a {@code STAT_BONUS} passive's magnitude into the stat block once at
+     * battle setup, leaving the other seven components untouched.
+     */
+    public Stats plus(StatName stat, int amount) {
+        return switch (stat) {
+            case STRENGTH -> new Stats(strength + amount, dexterity, vitality, intelligence, wisdom, spirit, speed, insight);
+            case DEXTERITY -> new Stats(strength, dexterity + amount, vitality, intelligence, wisdom, spirit, speed, insight);
+            case VITALITY -> new Stats(strength, dexterity, vitality + amount, intelligence, wisdom, spirit, speed, insight);
+            case INTELLIGENCE -> new Stats(strength, dexterity, vitality, intelligence + amount, wisdom, spirit, speed, insight);
+            case WISDOM -> new Stats(strength, dexterity, vitality, intelligence, wisdom + amount, spirit, speed, insight);
+            case SPIRIT -> new Stats(strength, dexterity, vitality, intelligence, wisdom, spirit + amount, speed, insight);
+            case SPEED -> new Stats(strength, dexterity, vitality, intelligence, wisdom, spirit, speed + amount, insight);
+            case INSIGHT -> new Stats(strength, dexterity, vitality, intelligence, wisdom, spirit, speed, insight + amount);
+        };
+    }
+
     /** True when any single component is negative — a spend delta must only ever add points. */
     public boolean hasNegativeComponent() {
         return strength < 0 || dexterity < 0 || vitality < 0 || intelligence < 0

@@ -11,6 +11,8 @@ import io.github.ydhekim.crimson_sky.common.model.Skill;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
 
+import java.util.HashMap;
+
 /**
  * Characters built so a turn's outcome is fixed regardless of the battle's (random) seed, which is
  * what lets these tests assert on damage without pinning a seed they don't own:
@@ -47,7 +49,8 @@ public final class CombatFixtures {
             1 /* maxHp */, 10 /* maxMp */, 10 /* maxStamina */, 0, 0,
             stats,
             new Inventory(new Array<>(), new Array<>(), new Array<>()),
-            new Loadout(new Array<Weapon>(), new Array<Skill>(), new Array<Pet>()));
+            new Loadout(new Array<Weapon>(), new Array<Skill>(), new Array<Pet>()),
+            new HashMap<>());
     }
 
     /**
@@ -59,7 +62,7 @@ public final class CombatFixtures {
         Character base = character(id, accountId, name);
         return new Character(base.id(), base.accountId(), base.name(), base.faction(), level, experience,
             base.maxHp(), base.maxMp(), base.maxStamina(), base.baseDef(), base.baseAtk(),
-            base.stats(), base.inventory(), base.loadout());
+            base.stats(), base.inventory(), base.loadout(), base.skillTree());
     }
 
     /** A character guaranteed to land exactly one 150-damage weapon hit per turn. */
@@ -77,6 +80,7 @@ public final class CombatFixtures {
             0 /* baseDef → full damage lands */, 0 /* baseAtk */,
             stats,
             new Inventory(new Array<>(), new Array<>(), new Array<>()),
-            new Loadout(Array.with(flatWeapon()), new Array<Skill>(), new Array<Pet>()));
+            new Loadout(Array.with(flatWeapon()), new Array<Skill>(), new Array<Pet>()),
+            new HashMap<>());
     }
 }

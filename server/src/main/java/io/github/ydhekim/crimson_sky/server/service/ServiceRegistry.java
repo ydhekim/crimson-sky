@@ -9,6 +9,7 @@ public class ServiceRegistry {
     private final CharacterService characterService;
     private final AttackService attackService;
     private final RewardService rewardService;
+    private final SkillTreeService skillTreeService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -26,6 +27,10 @@ public class ServiceRegistry {
         // `accounts` and `battle_history`, and onDemand proxies open a connection per call — so the only
         // way to get one transaction across all three is to attach the DAOs to a handle it owns.
         this.rewardService = new RewardService(dbManager.getJdbi(), characterService);
+
+        // Same reason as RewardService: a learn/upgrade spans `characters` (skill points, skill tree,
+        // inventory) and `accounts` (gold) atomically, so it needs the raw Jdbi, not onDemand proxies.
+        this.skillTreeService = new SkillTreeService(dbManager.getJdbi(), characterService);
 
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
@@ -51,6 +56,10 @@ public class ServiceRegistry {
 
     public RewardService getRewardService() {
         return rewardService;
+    }
+
+    public SkillTreeService getSkillTreeService() {
+        return skillTreeService;
     }
 
     public LocalizationService getLocalizationService() {

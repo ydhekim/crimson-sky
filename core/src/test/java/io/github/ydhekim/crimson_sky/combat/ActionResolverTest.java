@@ -46,7 +46,7 @@ class ActionResolverTest {
     }
 
     private static Skill skill(String name, int manaCost) {
-        return new Skill(1L, name, name + " description", SkillType.ACTIVE, manaCost, Difficulty.MEDIUM, 40, 60);
+        return new Skill(1L, name, name + " description", SkillType.ACTIVE, manaCost, Difficulty.MEDIUM, 40, 60, null, 0, null);
     }
 
     // --- GDD §5 scenarios ---------------------------------------------------------------------

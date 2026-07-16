@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.database.dao;
 
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
 import org.jdbi.v3.json.Json;
@@ -12,6 +13,7 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RegisterConstructorMapper(CharacterEntity.class)
@@ -57,8 +59,8 @@ public interface CharacterDao {
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE id = :characterId AND account_id = :accountId)")
     boolean isOwnedByAccount(@Bind("accountId") long accountId, @Bind("characterId") long characterId);
 
-    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, max_stamina, base_def, base_atk, stats, inventory, loadout) " +
-        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.maxStamina, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout)")
+    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, max_stamina, base_def, base_atk, stats, inventory, loadout, skill_tree) " +
+        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.maxStamina, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout, :c.skillTree)")
     @GetGeneratedKeys("id")
     long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 
@@ -121,6 +123,44 @@ public interface CharacterDao {
      */
     @SqlUpdate("UPDATE characters SET inventory = :inventory WHERE id = :characterId")
     void updateInventory(@Bind("characterId") long characterId, @Bind("inventory") @Json Inventory inventory);
+
+    /**
+     * Writes a character's whole loadout column back (system design §4.4/§16). Unlike inventory's
+     * append-style grant, a loadout save is unconditional — the client submits the entire new loadout
+     * each time. The <b>only</b> {@code UPDATE} on {@code characters} permitted to touch {@code loadout};
+     * a deliberate, named exception carved into {@code BattleLeavesInventoryAloneTest} (story C2), which
+     * continues to reject any other update reaching {@code loadout} <i>or</i> {@code inventory}.
+     */
+    @SqlUpdate("UPDATE characters SET loadout = :loadout WHERE id = :characterId")
+    void updateLoadout(@Bind("characterId") long characterId, @Bind("loadout") @Json Loadout loadout);
+
+    /** The learned skill-tree map (node id → rank) for a character (system design §16). */
+    @SqlQuery("SELECT skill_tree FROM characters WHERE id = :characterId")
+    @Json
+    Optional<Map<String, Integer>> getSkillTree(@Bind("characterId") long characterId);
+
+    /** Writes the whole skill-tree map back after a learn/upgrade (system design §16). */
+    @SqlUpdate("UPDATE characters SET skill_tree = :skillTree WHERE id = :characterId")
+    void updateSkillTree(@Bind("characterId") long characterId, @Bind("skillTree") @Json Map<String, Integer> skillTree);
+
+    /**
+     * The unspent skill-point balance for a character (system design §15/§16). Narrow read in the style
+     * of {@link #getUnspentStatPoints}: only the skill-tree spend path reads it, to compute a friendly
+     * over-budget error and the remaining balance; the authoritative overspend guard is
+     * {@link #spendSkillPoints}'s own {@code WHERE} clause.
+     */
+    @SqlQuery("SELECT skill_points FROM characters WHERE id = :characterId")
+    Optional<Integer> getSkillPoints(@Bind("characterId") long characterId);
+
+    /**
+     * Atomically spends skill points on a tree node (system design §16). The
+     * {@code AND skill_points >= :cost} clause is the real overspend guard — it makes the decrement fail
+     * (0 rows) rather than drive the balance negative if the caller's read lost a race. Returns rows
+     * affected: {@code 1} on success, {@code 0} when the guard rejected the spend.
+     */
+    @SqlUpdate("UPDATE characters SET skill_points = skill_points - :cost "
+        + "WHERE id = :characterId AND skill_points >= :cost")
+    int spendSkillPoints(@Bind("characterId") long characterId, @Bind("cost") int cost);
 
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);

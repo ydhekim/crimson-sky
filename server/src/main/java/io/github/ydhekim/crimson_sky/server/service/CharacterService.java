@@ -1,14 +1,21 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
+import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.model.Character;
+import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
+import io.github.ydhekim.crimson_sky.common.model.Pet;
+import io.github.ydhekim.crimson_sky.common.model.Skill;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
+import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.ToLongFunction;
 import java.util.stream.Collectors;
 
 public class CharacterService {
@@ -209,6 +216,85 @@ public class CharacterService {
             log.error("Exception during stat-point allocation for character " + characterId, e);
             return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
         }
+    }
+
+    /** The shared active+passive skill-slot cap (system design §16). */
+    public static final int MAX_LOADOUT_SKILLS = 5;
+
+    /**
+     * Replaces a character's equipped {@link Loadout} (system design §4.4/§16). Validates, in order:
+     * ownership (fail closed); that the combined skill slots (ACTIVE + PASSIVE share one pool) do not
+     * exceed {@link #MAX_LOADOUT_SKILLS}; and that every weapon/skill/pet id referenced in the submitted
+     * loadout exists in the character's current inventory — the ownership-of-items rule §4.4 always
+     * implied but never enforced in code. On success writes the whole loadout unconditionally.
+     *
+     * <p><b>Weight capacity is intentionally not enforced this pass</b> — Epic N doesn't exist yet, so a
+     * loadout that would fail N1's future weight gate saves successfully today.
+     */
+    public ServiceResult<Loadout> saveLoadout(long accountId, long characterId, Loadout loadout) {
+        try {
+            if (!isCharacterOwnedBy(accountId, characterId)) {
+                log.info("Loadout save rejected: character " + characterId + " not owned by account " + accountId);
+                return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+            }
+
+            Optional<CharacterEntity> entity = characterDao.findById(characterId);
+            if (entity.isEmpty()) {
+                log.info("Loadout save failed: character " + characterId + " could not be loaded.");
+                return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+            }
+
+            Loadout submitted = loadout != null ? loadout : new Loadout(null, null, null);
+            int skillCount = submitted.skills() != null ? submitted.skills().size : 0;
+            if (skillCount > MAX_LOADOUT_SKILLS) {
+                log.info("Loadout save rejected for character " + characterId + ": " + skillCount
+                    + " skills exceeds the cap of " + MAX_LOADOUT_SKILLS + ".");
+                return ServiceResult.failure(MessageCode.LOADOUT_SKILL_SLOTS_EXCEEDED);
+            }
+
+            Inventory inventory = entity.get().inventory();
+            if (!ownsAllItems(inventory, submitted)) {
+                log.info("Loadout save rejected for character " + characterId
+                    + ": references an item not in the character's inventory.");
+                return ServiceResult.failure(MessageCode.LOADOUT_ITEM_NOT_OWNED);
+            }
+
+            characterDao.updateLoadout(characterId, submitted);
+            log.info("Character " + characterId + " saved a new loadout.");
+            return ServiceResult.success(MessageCode.SUCCESS, submitted);
+        } catch (Exception e) {
+            log.error("Exception during loadout save for character " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    /** True only when every weapon/skill/pet in {@code loadout} is present (by id) in {@code inventory}. */
+    private boolean ownsAllItems(Inventory inventory, Loadout loadout) {
+        return allOwned(loadout.weapons(), inventory != null ? inventory.weapons() : null, Weapon::id)
+            && allOwned(loadout.skills(), inventory != null ? inventory.skills() : null, Skill::id)
+            && allOwned(loadout.pets(), inventory != null ? inventory.pets() : null, Pet::id);
+    }
+
+    /** Every equipped item's id must appear among the owned items; a null equipped list owns nothing to check. */
+    private <T> boolean allOwned(Array<T> equipped, Array<T> owned, ToLongFunction<T> idOf) {
+        if (equipped == null || equipped.size == 0) {
+            return true;
+        }
+        for (T item : equipped) {
+            boolean found = false;
+            if (owned != null) {
+                for (T candidate : owned) {
+                    if (idOf.applyAsLong(candidate) == idOf.applyAsLong(item)) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public ServiceResult<Void> deleteCharacter(long accountId, String name) {

@@ -50,6 +50,7 @@ public final class TestDatabase {
         jdbi.getConfig(Jackson2Config.class).setMapper(new ObjectMapper()
             .registerModule(new Jdk8Module())
             .registerModule(new ParameterNamesModule())
+            .registerModule(new io.github.ydhekim.crimson_sky.server.database.GdxArrayJacksonModule())
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false));
 
         jdbi.useHandle(handle -> {
@@ -67,7 +68,8 @@ public final class TestDatabase {
                 + "skill_points INTEGER NOT NULL DEFAULT 0, "
                 + "stats VARCHAR(2000), "
                 + "inventory VARCHAR(2000) NOT NULL, "
-                + "loadout VARCHAR(2000) NOT NULL)");
+                + "loadout VARCHAR(2000) NOT NULL, "
+                + "skill_tree VARCHAR(2000) NOT NULL DEFAULT '{}')");
             handle.execute("CREATE TABLE battle_history ("
                 + "id SERIAL PRIMARY KEY, "
                 + "character_id INTEGER NOT NULL REFERENCES characters (id), "
@@ -112,8 +114,26 @@ public final class TestDatabase {
         return this;
     }
 
+    /** Sets a character's skill-point balance (system design §16 spend tests). */
+    public TestDatabase withSkillPoints(long characterId, int skillPoints) {
+        jdbi.useHandle(handle -> handle
+            .execute("UPDATE characters SET skill_points = ? WHERE id = ?", skillPoints, characterId));
+        return this;
+    }
+
+    /** Seeds a character's skill-tree map verbatim (e.g. {@code {"physical.t1.n1":1}}) for upgrade tests. */
+    public TestDatabase withSkillTree(long characterId, String skillTreeJson) {
+        jdbi.useHandle(handle -> handle
+            .execute("UPDATE characters SET skill_tree = ? WHERE id = ?", skillTreeJson, characterId));
+        return this;
+    }
+
     public long goldOf(long accountId) {
         return queryOne("SELECT global_currency FROM accounts WHERE id = ?", Long.class, accountId);
+    }
+
+    public String skillTreeJsonOf(long characterId) {
+        return queryOne("SELECT skill_tree FROM characters WHERE id = ?", String.class, characterId);
     }
 
     public long experienceOf(long characterId) {

@@ -42,7 +42,7 @@ class DeterminismTest {
     }
 
     private static Skill sampleSkill() {
-        return new Skill(1L, "Fireball", "A ball of fire", SkillType.ACTIVE, 20, Difficulty.MEDIUM, 40, 60);
+        return new Skill(1L, "Fireball", "A ball of fire", SkillType.ACTIVE, 20, Difficulty.MEDIUM, 40, 60, null, 0, null);
     }
 
     @Test

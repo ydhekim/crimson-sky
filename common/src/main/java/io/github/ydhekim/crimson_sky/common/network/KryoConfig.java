@@ -95,6 +95,11 @@ public class KryoConfig {
         kryo.register(Difficulty.class);
         kryo.register(Tameness.class);
 
+        // Skill-tree passive effects (system design §16) — appended after the existing enum block so
+        // every positional ID above is untouched (system design §5, append-only).
+        kryo.register(PassiveEffectType.class);
+        kryo.register(StatName.class);
+
         // Combat (M2) — appended at the end so existing positional IDs above are untouched
         // (system design §5). ResolvedAction rides inside AttackResponse.turns().
         kryo.register(ActionSource.class);
@@ -110,5 +115,13 @@ public class KryoConfig {
         // after AttackResponse so every positional ID above is untouched (system design §5, append-only).
         kryo.register(AllocateStatPointsRequest.class, new RecordSerializer<>(AllocateStatPointsRequest.class));
         kryo.register(AllocateStatPointsResponse.class, new RecordSerializer<>(AllocateStatPointsResponse.class));
+
+        // Skill tree (system design §16) — learn/upgrade a node — and the loadout-save capability M3
+        // needs to make an equipped passive mean anything. Appended after AllocateStatPointsResponse so
+        // every positional ID above is untouched (system design §5, append-only).
+        kryo.register(LearnSkillNodeRequest.class, new RecordSerializer<>(LearnSkillNodeRequest.class));
+        kryo.register(LearnSkillNodeResponse.class, new RecordSerializer<>(LearnSkillNodeResponse.class));
+        kryo.register(SaveLoadoutRequest.class, new RecordSerializer<>(SaveLoadoutRequest.class));
+        kryo.register(SaveLoadoutResponse.class, new RecordSerializer<>(SaveLoadoutResponse.class));
     }
 }

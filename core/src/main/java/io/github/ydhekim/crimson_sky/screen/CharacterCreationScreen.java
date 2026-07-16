@@ -18,6 +18,8 @@ import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterRequest;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
+import java.util.HashMap;
+
 public class CharacterCreationScreen extends BaseScreen {
 
     // Per-stat cap is the shared lifetime ceiling (Stats.MAX_STAT_VALUE, system design §15), so the
@@ -225,7 +227,8 @@ public class CharacterCreationScreen extends BaseScreen {
             0, 0, characterName, selectedFaction, 1, 0, 100, 100, 100, 10, 10,
             characterStats,
             new Inventory(null, null, null),
-            new Loadout(null, null, null)
+            new Loadout(null, null, null),
+            new HashMap<>()
         );
 
         game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter));
