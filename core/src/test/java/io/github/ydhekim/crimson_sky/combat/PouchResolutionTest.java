@@ -38,16 +38,18 @@ class PouchResolutionTest {
 
     // --- starter-content fixtures (04-starter-content.md) --------------------------------------
 
+    // Durability is full (20/20) throughout: these cases isolate the *Stamina* walk, so no weapon may be
+    // skipped for being broken (§17). The one durability-driven case sets it explicitly, below.
     private static Weapon twinDaggers() {
-        return new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8);
+        return new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8, 20, 20);
     }
 
     private static Weapon steelLongsword() {
-        return new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15);
+        return new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15, 20, 20);
     }
 
     private static Weapon warhammer() {
-        return new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25);
+        return new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25, 20, 20);
     }
 
     private static Skill spark() {
@@ -117,7 +119,39 @@ class PouchResolutionTest {
         ResolvedAction action = ActionResolver.resolveCharacterAction(
             stats(80, 20, 10), heavyFirstPouch(), new Array<>(), 0, 5, rng());
 
-        assertEquals(new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false), action);
+        assertEquals(new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false, 0L), action);
+    }
+
+    // --- weapon pouch: durability rotates it exactly like Stamina does (§17) --------------------
+
+    @Test
+    void weaponPouch_skipsABrokenWeaponAndRotatesToTheNext() {
+        // Ample Stamina for all three, so Stamina cannot explain the choice: the Warhammer is skipped
+        // purely because it is broken (0 durability), and slot 0's gate roll still governs (§4.4).
+        Array<Weapon> pouch = Array.with(
+            warhammer().withCurrentDurability(0), steelLongsword(), twinDaggers());
+
+        ResolvedAction action = ActionResolver.resolveCharacterAction(
+            stats(80, 20, 10), pouch, new Array<>(), 0, 100, rng());
+
+        assertEquals(ActionSource.WEAPON, action.source());
+        assertEquals("Steel Longsword", action.label(), "a broken weapon is skipped like an unaffordable one");
+        assertEquals(2L, action.itemId(), "the entry names which weapon actually fired (§17)");
+    }
+
+    @Test
+    void weaponPouch_allWeaponsBroken_fallsBackToPunch() {
+        // Every weapon broken, Stamina untouched at 100 → the branch falls through exactly as it does
+        // when nothing is affordable, with no separate "does nothing" outcome (§17).
+        Array<Weapon> pouch = Array.with(
+            warhammer().withCurrentDurability(0),
+            steelLongsword().withCurrentDurability(0),
+            twinDaggers().withCurrentDurability(0));
+
+        ResolvedAction action = ActionResolver.resolveCharacterAction(
+            stats(80, 20, 10), pouch, new Array<>(), 0, 100, rng());
+
+        assertEquals(new ResolvedAction(ActionSource.PUNCH, "Punch", 1, false, 0L), action);
     }
 
     // --- skill pouch: Mana-driven priority walk (most-expensive-first) -------------------------
@@ -164,7 +198,7 @@ class PouchResolutionTest {
             stats(5, 100, 10), new Array<>(), expensiveFirstPouch(), 5, Integer.MAX_VALUE, rng());
 
         assertEquals(
-            new ResolvedAction(ActionSource.SKILL, ActionResolver.FAILED_CAST_LABEL, 1, true), action);
+            new ResolvedAction(ActionSource.SKILL, ActionResolver.FAILED_CAST_LABEL, 1, true, 0L), action);
         assertTrue(action.failed());
     }
 

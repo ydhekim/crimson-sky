@@ -2,9 +2,11 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Rarity;
+import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
@@ -14,8 +16,10 @@ import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import org.jdbi.v3.core.Jdbi;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Applies the Elo/Gold/Exp payout for an already-resolved attack and records it in
@@ -38,6 +42,13 @@ import java.util.Random;
  * battle can push a character across one or more level thresholds, granting stat points, always grants
  * per-battle skill points, and — on crossing a 10/20/30/40/50 milestone — can roll a bonus item into the
  * attacker's inventory. All of it commits inside the same transaction as the currency writes.
+ *
+ * <p><b>Epic N adds the first cost to the same transaction</b> (system design §17): every weapon that
+ * fired at least once loses a point of durability. Like the item grant it is a JSONB read-modify-write of
+ * {@code characters.inventory} under the row lock — and it shares that one read and one write, because
+ * {@code Inventory} is the single source of truth for durability and {@code updateInventory} is the single
+ * sanctioned way to write it (C2). Nothing here reports a weapon that just broke; surfacing that is the
+ * combat screen's job (M4), the same deferral the crit flag took.
  */
 public class RewardService {
 
@@ -73,9 +84,9 @@ public class RewardService {
      * future table entries but have no acquisition mechanic in code yet, so this v1.0 pass grants weapons
      * only — no placeholder item types invented ahead of the epics that define them.
      */
-    private static final Weapon TWIN_DAGGERS = new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8);
-    private static final Weapon STEEL_LONGSWORD = new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15);
-    private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25);
+    private static final Weapon TWIN_DAGGERS = new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8, 20, 20);
+    private static final Weapon STEEL_LONGSWORD = new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15, 20, 20);
+    private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25, 20, 20);
     private static final List<Weapon> BONUS_WEAPONS = List.of(TWIN_DAGGERS, STEEL_LONGSWORD, WARHAMMER);
 
     private final Jdbi jdbi;
@@ -146,6 +157,10 @@ public class RewardService {
             base.goldDelta(), base.expDelta(), base.eloDelta(),
             base.skillPointsGained(), levelsGained, statPointsGained, bonusRewardGranted);
 
+        // Durability (N2 / §17): which of the attacker's weapons fired at all this battle. Decided here,
+        // before any write, for the same reason the milestone roll is — the whole outcome is known first.
+        Set<Long> firedWeaponIds = firedWeaponIds(result);
+
         try {
             jdbi.useTransaction(handle -> {
                 CharacterDao characterDao = handle.attach(CharacterDao.class);
@@ -157,11 +172,14 @@ public class RewardService {
                     result.characterId(), result.opponentCharacterId(), result.opponentIsBot(),
                     outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta());
 
-                // Only touch the inventory column when a bonus actually fired — a read-modify-write under
-                // the row lock, in the same transaction, so a granted item commits or rolls back with the
-                // rest of the reward (system design §15, and the C2 write-path exception).
-                if (!bonusWeapons.isEmpty()) {
-                    grantBonusWeapons(characterDao, result.characterId(), bonusWeapons);
+                // Only touch the inventory column when something actually changed it — a read-modify-write
+                // under the row lock, in the same transaction, so an item grant or a durability decrement
+                // commits or rolls back with the rest of the reward (§15/§17, and the C2 write-path
+                // exception). Both transformations share the one read and the one write: §18 makes this
+                // explicit — every feature that mutates `inventory` from here on is a different in-memory
+                // transformation before the same `updateInventory` call, not a new write path.
+                if (!bonusWeapons.isEmpty() || !firedWeaponIds.isEmpty()) {
+                    updateInventory(characterDao, result.characterId(), firedWeaponIds, bonusWeapons);
                 }
             });
         } catch (Exception e) {
@@ -225,20 +243,69 @@ public class RewardService {
     }
 
     /**
-     * Appends granted weapons onto the attacker's stored inventory inside the reward transaction. Tolerates
-     * a {@code null} weapons array — every character created to date persists inventory in the null form
-     * (creation stores {@code new Inventory(null, null, null)}), so this grant is the first code to write a
-     * real array and must not NPE on the existing shape.
+     * The attacker's stored inventory, read under the row lock, transformed by both of this battle's
+     * effects, and written back once (§15's item grant + §17's durability wear).
+     *
+     * <p>Order is deliberate: existing weapons wear <b>before</b> the grant appends, so a weapon handed
+     * out as this battle's milestone bonus is never charged durability for a battle it wasn't carried in.
+     *
+     * <p>Tolerates a {@code null} weapons array — every character created to date persists inventory in
+     * the null form (creation stores {@code new Inventory(null, null, null)}), so the grant is still the
+     * first code to write a real array and must not NPE on the existing shape.
+     *
+     * <p>Writes nothing at all if neither transformation changed anything — a battle whose only weapon
+     * was already broken (0 durability, so {@link Weapon#worn()} is a no-op) leaves the column untouched
+     * rather than rewriting it identically. C2's rule is that a battle touches stored items only when it
+     * genuinely has something to record.
      */
-    private void grantBonusWeapons(CharacterDao characterDao, long characterId, List<Weapon> bonusWeapons) {
+    private void updateInventory(CharacterDao characterDao, long characterId,
+                                 Set<Long> firedWeaponIds, List<Weapon> bonusWeapons) {
         Inventory inventory = characterDao.getInventoryForUpdate(characterId)
             .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>()));
         Array<Weapon> weapons = inventory.weapons() != null ? inventory.weapons() : new Array<>();
+
+        boolean changed = false;
+        for (int i = 0; i < weapons.size; i++) {
+            Weapon weapon = weapons.get(i);
+            if (firedWeaponIds.contains(weapon.id()) && weapon.currentDurability() > 0) {
+                weapons.set(i, weapon.worn()); // −1, floored at 0 by Weapon.worn()
+                changed = true;
+            }
+        }
         for (Weapon weapon : bonusWeapons) {
             weapons.add(weapon);
+            changed = true;
         }
-        characterDao.updateInventory(characterId,
-            new Inventory(weapons, inventory.skills(), inventory.pets()));
+
+        if (changed) {
+            characterDao.updateInventory(characterId,
+                new Inventory(weapons, inventory.skills(), inventory.pets()));
+        }
+    }
+
+    /**
+     * The distinct ids of the attacker's weapons that fired at least once this battle (§17). A weapon wears
+     * by 1 per <b>battle</b>, not per hit or per repeat, so appearing in any {@code WEAPON}-source entry at
+     * all is what counts — hence a set, not a tally. Entries from other sources carry an id too (§17's
+     * {@code ResolvedAction.itemId}), so the source filter is what makes this weapons-only; {@code PUNCH}
+     * and Burned casts carry {@code 0} and would be filtered by the source check regardless.
+     *
+     * <p>{@code result.turns()} is the attacker's own turn history — never the opponent's — so this can
+     * only ever wear the character being rewarded.
+     */
+    static Set<Long> firedWeaponIds(AttackResult result) {
+        Set<Long> ids = new LinkedHashSet<>();
+        if (result.turns() == null) {
+            return ids;
+        }
+        for (Array<ResolvedAction> turn : result.turns()) {
+            for (ResolvedAction action : turn) {
+                if (action.source() == ActionSource.WEAPON && action.itemId() != 0L) {
+                    ids.add(action.itemId());
+                }
+            }
+        }
+        return ids;
     }
 
     /**

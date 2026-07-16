@@ -88,8 +88,13 @@ public final class CombatMath {
         return currentMana >= skill.manaCost();
     }
 
-    /** Weapon-branch convenience: does the character have the stamina left to draw this weapon? */
+    /**
+     * Weapon-branch convenience: can this weapon still be drawn? Two independent ways to answer no, both
+     * expressed as plain unaffordability so the pouch walk needs no "is it broken" branch of its own
+     * (§17): a broken weapon ({@code currentDurability == 0}) is skipped exactly like one there's no
+     * Stamina left for, rotating to the next weapon or falling through to punch.
+     */
     public static boolean isAffordable(Weapon weapon, int remainingStamina) {
-        return remainingStamina >= weapon.staminaCost();
+        return weapon.currentDurability() > 0 && remainingStamina >= weapon.staminaCost();
     }
 }

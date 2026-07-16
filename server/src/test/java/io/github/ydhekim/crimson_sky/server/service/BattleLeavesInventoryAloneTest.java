@@ -30,11 +30,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * loss at all — Break/Steal are deferred (Epic J) — so there is no item-loss scenario to fight through
  * end to end, and inventing one would test a mechanic that doesn't exist rather than the rule that does.
  * What C2 actually protects is narrower and testable today: <i>a battle, from resolution through reward
- * persistence, never issues a write to a character's stored items.</i> Both halves of that are asserted
- * below — empirically (the stored JSON is byte-for-byte identical across a full attack + reward round
- * trip that demonstrably did write other columns) and structurally (no {@code UPDATE} in
- * {@link CharacterDao} can touch those columns in the first place). When an item-loss skill does land,
- * this test is the one it has to keep passing.
+ * persistence, never takes a stored item away from a character.</i> Both halves of that are asserted
+ * below — empirically (across a full attack + reward round trip that demonstrably did write other
+ * columns, every stored item is still there) and structurally (only two named {@code UPDATE}s in
+ * {@link CharacterDao} can touch those columns at all). When an item-loss skill does land, this test is
+ * the one it has to keep passing.
+ *
+ * <p><b>Narrowed at Epic N, deliberately (§17):</b> this test used to assert the stored {@code inventory}
+ * JSON was <i>byte-for-byte</i> identical after a battle. Durability made that assertion wrong rather
+ * than violated — a battle now legitimately writes one field of one item (a fired weapon's
+ * {@code currentDurability}), through the same sanctioned {@code updateInventory} path, and
+ * {@link #aFiredWeaponsDurabilityDecrementLandsInThePersistedInventory} pins that it does. What C2 was
+ * always defending is the item's <i>existence</i>, not the immutability of every byte in the column, so
+ * that is what the round-trip test below now asserts. {@code loadout} is still byte-for-byte checked: a
+ * battle has no business writing there at all.
  */
 class BattleLeavesInventoryAloneTest {
 
@@ -43,10 +52,18 @@ class BattleLeavesInventoryAloneTest {
     private static final long ATTACKER = 1L;
     private static final long OPPONENT = 2L;
 
+    /**
+     * The attacker owns and equips the weapon {@link CombatFixtures#character} fights with (id 1), at full
+     * durability — so a battle really does fire it, and §17's decrement has something real to land on.
+     * Spelling the durability fields out matters: a stored weapon defaulting to {@code currentDurability
+     * 0} would read as broken and never fire, quietly making the decrement assertions vacuous.
+     */
     private static final String INVENTORY_JSON =
-        "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\"}],\"skills\":[],\"pets\":[]}";
+        "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,\"currentDurability\":20}],"
+            + "\"skills\":[],\"pets\":[]}";
     private static final String LOADOUT_JSON =
-        "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\"}],\"skills\":[],\"pets\":[]}";
+        "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,\"currentDurability\":20}],"
+            + "\"skills\":[],\"pets\":[]}";
 
     private TestDatabase db;
     private AttackService attackService;
@@ -72,27 +89,50 @@ class BattleLeavesInventoryAloneTest {
     }
 
     @Test
-    void aFullAttackAndItsRewardLeaveTheStoredItemsByteForByteIdentical() {
-        String inventoryBefore = db.inventoryJsonOf(ATTACKER);
+    void aFullAttackAndItsRewardNeverTakeAStoredItemAway() {
         String loadoutBefore = db.loadoutJsonOf(ATTACKER);
 
         Optional<AttackResult> result = attackService.attack(ATTACKER);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         RewardOutcome outcome = rewardService.applyRewards(result.get());
 
-        assertEquals(inventoryBefore, db.inventoryJsonOf(ATTACKER),
-            "a battle never writes to a character's inventory — items are not lost from storage (§8)");
+        String inventoryAfter = db.inventoryJsonOf(ATTACKER);
+        assertTrue(inventoryAfter.contains("Testing Hammer"),
+            "a battle never removes an item from storage — items are not lost in battle (§8)");
+        assertEquals(1, weaponCountOf(inventoryAfter),
+            "and never adds one either, absent a milestone bonus: the item set is exactly what it was");
         assertEquals(loadoutBefore, db.loadoutJsonOf(ATTACKER),
-            "nor to their loadout: what a battle spends (stamina, mana) is in-memory state only");
+            "the loadout is byte-for-byte untouched: what a battle spends (stamina, mana) is in-memory only");
 
         // Without this the assertions above would pass on a flow that wrote nothing whatsoever.
         assertNotEquals(RewardOutcome.none(), outcome, "precondition: this round trip really did persist");
         assertEquals(outcome.expDelta(), db.experienceOf(ATTACKER));
         assertEquals(1, db.battleHistoryRowCount());
 
-        // The opponent is a snapshot: an attack against it must not write anything of theirs either.
+        // The opponent is a snapshot: an attack against it must not write anything of theirs — including
+        // durability. Only the attacker is rewarded, so only the attacker's weapons ever wear (§17).
         assertEquals(INVENTORY_JSON, db.inventoryJsonOf(OPPONENT));
         assertEquals(0L, db.experienceOf(OPPONENT));
+    }
+
+    @Test
+    void aFiredWeaponsDurabilityDecrementLandsInThePersistedInventory() {
+        // The positive half of the rule this test narrowed for (§17): the battle's *one* sanctioned write
+        // to `inventory` is a fired weapon's durability, and it commits with the rest of the reward.
+        // CombatFixtures.character always draws its weapon (STR 100), so id 1 fires every battle.
+        Optional<AttackResult> result = attackService.attack(ATTACKER);
+        assertTrue(result.isPresent(), "precondition: the battle resolves");
+        rewardService.applyRewards(result.get());
+
+        assertTrue(db.inventoryJsonOf(ATTACKER).contains("\"currentDurability\":19"),
+            "the fired weapon wore by exactly 1 (20 → 19), written through updateInventory");
+        assertTrue(db.inventoryJsonOf(ATTACKER).contains("\"maxDurability\":20"),
+            "wear touches current durability only — max is what repair restores to (Epic O)");
+    }
+
+    /** Weapon entries in a stored inventory blob, counted by the one key every weapon has. */
+    private static int weaponCountOf(String inventoryJson) {
+        return inventoryJson.split("\"id\":", -1).length - 1;
     }
 
     @Test
@@ -102,8 +142,13 @@ class BattleLeavesInventoryAloneTest {
         // `updateLoadout` (§16's loadout-save capability) for `loadout` — and neither may touch the other's
         // column. Every other UPDATE is still barred from `inventory`/`loadout` entirely, so no battle-side
         // code can start writing there by accident. These are the deliberate, named exceptions C2's
-        // docstring anticipated — not regressions. The next capability that needs to write items (durability,
-        // §N) adds its method here the same way.
+        // docstring anticipated — not regressions.
+        //
+        // Still exactly two after Epic N: §17's durability decrement needed NO new exception, because it is
+        // a different in-memory transformation before the same `updateInventory` call, not a new write path
+        // (§18 makes that the standing rule for every feature that mutates `inventory` from here on — pet
+        // health, consumable charges). If a future pass adds a third name to this list, that is the design
+        // going wrong, not the test.
         boolean sawSanctionedInventoryWriter = false;
         boolean sawSanctionedLoadoutWriter = false;
         for (Method method : CharacterDao.class.getDeclaredMethods()) {

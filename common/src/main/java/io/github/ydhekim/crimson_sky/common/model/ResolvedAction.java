@@ -10,7 +10,14 @@ package io.github.ydhekim.crimson_sky.common.model;
  * {@link io.github.ydhekim.crimson_sky.combat.ActionResolver decision layer} produces entries with
  * {@code damage = 0}, and the battle turn resolution fills in the real total.
  *
- * <p>The four-arg constructor is a convenience for the decision layer, which knows the action but
+ * <p>{@code itemId} identifies <b>which</b> record the entry acted with — {@code source}'s category
+ * alone can't, once a pouch holds several weapons or skills (system design §17). It carries the
+ * {@code Weapon}/{@code Skill}/{@code Pet} id for those sources, and {@code 0} for {@code PUNCH} (no
+ * backing record, see {@link ActionSource}) and for a Burned cast. Durability bookkeeping
+ * ({@code RewardService}, §17) is its first consumer — it reads back which weapons fired — and Epic O's
+ * consumable-charge tracking is the next.
+ *
+ * <p>The five-arg constructor is a convenience for the decision layer, which knows the action but
  * not yet its damage; it defaults {@code damage} to {@code 0}.
  *
  * <p>Registered in {@code KryoConfig} (after the existing entries) because it rides inside
@@ -21,10 +28,11 @@ public record ResolvedAction(
     String label,
     int frequency,
     boolean failed,
-    int damage
+    int damage,
+    long itemId
 ) {
     /** Decision-layer convenience: an action whose damage has not been applied yet ({@code 0}). */
-    public ResolvedAction(ActionSource source, String label, int frequency, boolean failed) {
-        this(source, label, frequency, failed, 0);
+    public ResolvedAction(ActionSource source, String label, int frequency, boolean failed, long itemId) {
+        this(source, label, frequency, failed, 0, itemId);
     }
 }

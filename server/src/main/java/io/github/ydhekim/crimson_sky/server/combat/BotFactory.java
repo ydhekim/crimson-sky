@@ -116,9 +116,11 @@ public class BotFactory {
     // Duplicated as constants rather than seeded into the DB, deliberately: Epic E makes content
     // data-driven, and a bot must not depend on a `weapons`/`skills` table that doesn't exist yet.
 
-    private static final Weapon TWIN_DAGGERS = new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8);
-    private static final Weapon STEEL_LONGSWORD = new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15);
-    private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25);
+    // Durability (§17) is full (20/20) on every bot weapon: a bot is synthesized fresh for one battle and
+    // has no inventory to wear down, so it must never start a fight holding a broken weapon.
+    private static final Weapon TWIN_DAGGERS = new Weapon(1L, "Twin Daggers", "", Rarity.COMMON, 2f, 8, 18, 8, 20, 20);
+    private static final Weapon STEEL_LONGSWORD = new Weapon(2L, "Steel Longsword", "", Rarity.UNCOMMON, 15f, 12, 28, 15, 20, 20);
+    private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25, 20, 20);
 
     // ACTIVE skills leave the three trailing passive fields empty (null, 0, null), per §16's Skill shape.
     private static final Skill SPARK = new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40, null, 0, null);

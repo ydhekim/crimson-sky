@@ -33,9 +33,18 @@ public final class CombatFixtures {
     private CombatFixtures() {
     }
 
-    /** A light (weight 2 → no STR draw penalty), affordable, flat-damage weapon. */
+    /** Full durability (§17): a fixture shipping at 0 would be unaffordable, silently punching instead. */
+    public static final int FULL_DURABILITY = 20;
+
+    /** A light (weight 2 → no STR draw penalty), affordable, undamaged, flat-damage weapon. */
     public static Weapon flatWeapon() {
-        return new Weapon(1L, "Testing Hammer", "", Rarity.COMMON, 2f, 100, 100, 5);
+        return flatWeapon(FULL_DURABILITY);
+    }
+
+    /** {@link #flatWeapon()} at a chosen {@code currentDurability} — for the §17 wear/broken cases. */
+    public static Weapon flatWeapon(int currentDurability) {
+        return new Weapon(1L, "Testing Hammer", "", Rarity.COMMON, 2f, 100, 100, 5,
+            FULL_DURABILITY, currentDurability);
     }
 
     /**
