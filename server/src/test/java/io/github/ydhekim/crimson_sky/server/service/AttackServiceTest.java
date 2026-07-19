@@ -6,13 +6,16 @@ import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
+import io.github.ydhekim.crimson_sky.server.quest.QuestPeriods;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
+import io.github.ydhekim.crimson_sky.server.support.FakeBattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
 import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.RecordComponent;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -35,17 +38,19 @@ class AttackServiceTest {
     private static final long ATTACKER = 1L;
 
     private FakeCharacterDao characterDao;
+    private FakeBattleHistoryDao battleHistoryDao;
 
     @BeforeEach
     void setUp() {
         HeadlessGdx.install();
         characterDao = new FakeCharacterDao()
             .with(CombatFixtures.character(ATTACKER, ACCOUNT_A, "Ayla"), ACCOUNT_A, 1000);
+        battleHistoryDao = new FakeBattleHistoryDao();
     }
 
     /** A service with a seeded RNG so "pick randomly among candidates" is reproducible. */
     private AttackService service() {
-        return new AttackService(new CharacterService(characterDao), new BotFactory(new Random(42L)), new Random(42L));
+        return new AttackService(new CharacterService(characterDao), new BotFactory(new Random(42L)), battleHistoryDao, new Random(42L));
     }
 
     private AttackResult attack() {
@@ -136,6 +141,31 @@ class AttackServiceTest {
     @Test
     void refusesToAttackWithACharacterThatCannotBeLoaded() {
         assertTrue(service().attack(999L).isEmpty(), "an unknown character resolves no battle");
+    }
+
+    @Test
+    void allowsFiveBattlesADayWhenNoneHaveBeenFoughtYet() {
+        assertEquals(5, service().remainingDailyBattles(ATTACKER),
+            "the base cap is five battles per UTC day (system design §20)");
+    }
+
+    @Test
+    void reachesZeroRemainingAfterFiveBattlesToday() {
+        for (int i = 0; i < 5; i++) {
+            battleHistoryDao.with(ATTACKER, false, Instant.now());
+        }
+        assertEquals(0, service().remainingDailyBattles(ATTACKER),
+            "five battles today exhausts the base cap");
+    }
+
+    @Test
+    void doesNotCountYesterdaysBattlesAgainstTodaysCap() {
+        Instant beforeMidnight = QuestPeriods.startOfToday().minusSeconds(1);
+        for (int i = 0; i < 5; i++) {
+            battleHistoryDao.with(ATTACKER, false, beforeMidnight);
+        }
+        assertEquals(5, service().remainingDailyBattles(ATTACKER),
+            "battles before this UTC day's midnight are outside the daily window");
     }
 
     @Test

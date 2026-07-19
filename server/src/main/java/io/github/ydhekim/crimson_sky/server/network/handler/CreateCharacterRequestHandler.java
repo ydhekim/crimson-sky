@@ -23,7 +23,7 @@ public class CreateCharacterRequestHandler implements RequestHandler<CreateChara
         }
 
         log.info("Received create character request for name '" + request.character().name() + "' from Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());
-        var result = characterService.createCharacter(connection.account.id(), request.character());
+        var result = characterService.createCharacter(connection.account.id(), connection.account.maxSlots(), request.character());
 
         if (result.success()) {
             log.info("Successfully created character '" + request.character().name() + "' for Connection ID: " + connection.getID() + ", Account ID: " + connection.account.id());

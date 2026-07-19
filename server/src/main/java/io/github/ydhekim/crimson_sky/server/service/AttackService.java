@@ -8,6 +8,8 @@ import io.github.ydhekim.crimson_sky.combat.BattleSession;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
+import io.github.ydhekim.crimson_sky.server.quest.QuestPeriods;
 
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +42,9 @@ public class AttackService {
     /** Preferred Elo band for a real opponent (system design §7). */
     static final int BASE_ELO_RANGE = 100;
 
+    /** Base battles a character may fight per UTC day before the cap rejects an attack (system design §20). */
+    private static final int BASE_DAILY_BATTLE_CAP = 5;
+
     /**
      * Correlation id for a battle that exists only for the life of one request. Not a database key and
      * not addressable by the client — it exists so a fight can be traced through the logs.
@@ -48,17 +53,39 @@ public class AttackService {
 
     private final CharacterService characterService;
     private final BotFactory botFactory;
+    private final BattleHistoryDao battleHistoryDao;
     private final Random random;
 
-    public AttackService(CharacterService characterService, BotFactory botFactory) {
-        this(characterService, botFactory, ThreadLocalRandom.current());
+    public AttackService(CharacterService characterService, BotFactory botFactory, BattleHistoryDao battleHistoryDao) {
+        this(characterService, botFactory, battleHistoryDao, ThreadLocalRandom.current());
     }
 
     /** Test seam: a seeded {@link Random} fixes which candidate is picked from the pool. */
-    AttackService(CharacterService characterService, BotFactory botFactory, Random random) {
+    AttackService(CharacterService characterService, BotFactory botFactory, BattleHistoryDao battleHistoryDao, Random random) {
         this.characterService = characterService;
         this.botFactory = botFactory;
+        this.battleHistoryDao = battleHistoryDao;
         this.random = random;
+    }
+
+    /**
+     * How many more battles {@code characterId} may fight today (system design §20), floored at 0. Call
+     * this before {@link #attack}, not as part of it — "daily cap reached" is a distinct rejection reason
+     * the client must be able to tell apart from attack()'s existing failure modes, so it stays a separate
+     * pre-check rather than widening attack()'s return type.
+     *
+     * <p>A failed bonus lookup falls back to bonus 0 (base cap only) rather than blocking the request: by
+     * the time this is called the handler has already confirmed the character is owned by the connection's
+     * account, so a lookup failure here is a rare data race, not a reason to spuriously cap a player at 0.
+     */
+    public int remainingDailyBattles(long characterId) {
+        int bonus = 0;
+        ServiceResult<Integer> bonusResult = characterService.getBonusDailyBattles(characterId);
+        if (bonusResult.success()) {
+            bonus = bonusResult.data();
+        }
+        int battlesToday = battleHistoryDao.countBattlesSince(characterId, QuestPeriods.startOfToday());
+        return Math.max(0, (BASE_DAILY_BATTLE_CAP + bonus) - battlesToday);
     }
 
     /** Ownership guardrail, delegated — the only check {@code AttackRequest} needs (system design §6). */

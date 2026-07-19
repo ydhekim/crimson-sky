@@ -7,6 +7,7 @@ import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Tameness;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
 import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
@@ -115,7 +116,7 @@ class RewardServicePetHealthTest {
 
         CharacterService characterService = new CharacterService(dao);
         AttackService attackService = new AttackService(
-            characterService, new BotFactory(new Random(42L)), new Random(42L));
+            characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService rewardService = new RewardService(db.jdbi(), characterService);
 
         Optional<AttackResult> result = attackService.attack(ATTACKER);

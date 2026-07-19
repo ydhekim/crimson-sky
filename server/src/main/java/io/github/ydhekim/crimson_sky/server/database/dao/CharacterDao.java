@@ -162,6 +162,21 @@ public interface CharacterDao {
         + "WHERE id = :characterId AND skill_points >= :cost")
     int spendSkillPoints(@Bind("characterId") long characterId, @Bind("cost") int cost);
 
+    /**
+     * The daily-battle-cap bonus for a character (system design §20). Narrow read in the style of
+     * {@link #getUnspentStatPoints}: only {@code AttackService}'s cap check needs it.
+     */
+    @SqlQuery("SELECT bonus_daily_battles FROM characters WHERE id = :characterId")
+    Optional<Integer> getBonusDailyBattles(@Bind("characterId") long characterId);
+
+    /**
+     * Grants (or revokes, with a negative {@code delta}) daily-battle-cap bonus (system design §20/Q3).
+     * An atomic increment, not a read-then-write — mirrors {@link AccountDao#addGlobalCurrency}. Nothing
+     * calls this yet; it exists so a future IAP/achievement/quest grant path has somewhere to write.
+     */
+    @SqlUpdate("UPDATE characters SET bonus_daily_battles = bonus_daily_battles + :delta WHERE id = :characterId")
+    void addBonusDailyBattles(@Bind("characterId") long characterId, @Bind("delta") int delta);
+
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);
 

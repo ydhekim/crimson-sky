@@ -8,6 +8,7 @@ import io.github.ydhekim.crimson_sky.common.model.Tameness;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
@@ -89,7 +90,7 @@ class BattleLeavesInventoryAloneTest {
             .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, INVENTORY_JSON, LOADOUT_JSON);
 
         CharacterService characterService = new CharacterService(characterDao);
-        attackService = new AttackService(characterService, new BotFactory(new Random(42L)), new Random(42L));
+        attackService = new AttackService(characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         rewardService = new RewardService(db.jdbi(), characterService);
     }
 
@@ -159,7 +160,7 @@ class BattleLeavesInventoryAloneTest {
 
         CharacterService characterService = new CharacterService(dao);
         AttackService shopAttack = new AttackService(
-            characterService, new BotFactory(new Random(42L)), new Random(42L));
+            characterService, new BotFactory(new Random(42L)), shopDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService shopReward = new RewardService(shopDb.jdbi(), characterService);
         ShopService shopService = new ShopService(shopDb.jdbi(), characterService);
 
@@ -295,7 +296,7 @@ class BattleLeavesInventoryAloneTest {
             .withCharacter(opponent, accountB, "Boran", 1, 0L, 1000, nullInventory, nullInventory);
 
         CharacterService characterService = new CharacterService(dao);
-        AttackService bonusAttack = new AttackService(characterService, new BotFactory(new Random(42L)), new Random(42L));
+        AttackService bonusAttack = new AttackService(characterService, new BotFactory(new Random(42L)), bonusDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService bonusReward = new RewardService(bonusDb.jdbi(), characterService, alwaysRollsBonus());
 
         Optional<AttackResult> result = bonusAttack.attack(attacker);

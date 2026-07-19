@@ -23,7 +23,8 @@ public class ServiceRegistry {
 
         CharacterDao characterDao = dbManager.getJdbi().onDemand(CharacterDao.class);
         this.characterService = new CharacterService(characterDao);
-        this.attackService = new AttackService(characterService, new BotFactory());
+        BattleHistoryDao battleHistoryDao = dbManager.getJdbi().onDemand(BattleHistoryDao.class);
+        this.attackService = new AttackService(characterService, new BotFactory(), battleHistoryDao);
 
         // The odd one out: it takes the Jdbi itself, not an onDemand DAO. A reward spans `characters`,
         // `accounts` and `battle_history`, and onDemand proxies open a connection per call — so the only

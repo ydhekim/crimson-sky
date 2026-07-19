@@ -120,9 +120,24 @@ public class CharacterService {
         }
     }
 
-    public ServiceResult<Long> createCharacter(long accountId, Character character) {
+    /** The daily-battle-cap bonus for a character (system design §20), for AttackService's cap check. */
+    public ServiceResult<Integer> getBonusDailyBattles(long characterId) {
         try {
-            if (characterDao.getCharacterCount(accountId) >= 3) {
+            return characterDao.getBonusDailyBattles(characterId)
+                .map(bonus -> ServiceResult.success(MessageCode.SUCCESS, bonus))
+                .orElseGet(() -> {
+                    log.info("Daily-battle-bonus lookup found no character with ID: " + characterId);
+                    return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+                });
+        } catch (Exception e) {
+            log.error("Daily-battle-bonus lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    public ServiceResult<Long> createCharacter(long accountId, int maxSlots, Character character) {
+        try {
+            if (characterDao.getCharacterCount(accountId) >= maxSlots) {
                 log.info("Character creation failed for account ID " + accountId + ": Maximum character slots reached.");
                 return ServiceResult.failure(MessageCode.CHAR_MAX_SLOTS_REACHED);
             }

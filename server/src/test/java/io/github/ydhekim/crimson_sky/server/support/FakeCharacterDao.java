@@ -196,6 +196,16 @@ public class FakeCharacterDao implements CharacterDao {
     }
 
     @Override
+    public Optional<Integer> getBonusDailyBattles(long characterId) {
+        return rows.containsKey(characterId) ? Optional.of(0) : Optional.empty();
+    }
+
+    @Override
+    public void addBonusDailyBattles(long characterId, int delta) {
+        throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");
+    }
+
+    @Override
     public boolean deleteCharacter(long accountId, String name) {
         throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");
     }
