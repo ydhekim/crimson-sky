@@ -152,5 +152,11 @@ public class KryoConfig {
         kryo.register(QuestStatusResponse.class, new RecordSerializer<>(QuestStatusResponse.class));
         kryo.register(ClaimQuestRequest.class, new RecordSerializer<>(ClaimQuestRequest.class));
         kryo.register(ClaimQuestResponse.class, new RecordSerializer<>(ClaimQuestResponse.class));
+
+        // Account levers (Epic Q / system design §20) — the daily-battle-cap rejection. Appended after the
+        // quest packets so every positional ID above is untouched (system design §5, append-only). Registered
+        // here, not beside AttackResponse, precisely because registration is positional: order must match on
+        // both sides, so a conceptually-related packet still goes at the physical end.
+        kryo.register(AttackRejectedResponse.class, new RecordSerializer<>(AttackRejectedResponse.class));
     }
 }

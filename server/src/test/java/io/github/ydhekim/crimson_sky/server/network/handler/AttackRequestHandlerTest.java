@@ -1,8 +1,11 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
+import io.github.ydhekim.crimson_sky.common.model.MessageCode;
+import io.github.ydhekim.crimson_sky.common.network.packet.AttackRejectedResponse;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.service.AttackService;
 import io.github.ydhekim.crimson_sky.server.service.CharacterService;
 import io.github.ydhekim.crimson_sky.server.service.RewardService;
@@ -13,6 +16,8 @@ import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
 import io.github.ydhekim.crimson_sky.server.support.TestDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -58,7 +63,7 @@ class AttackRequestHandlerTest {
     private AttackRequestHandler handler() {
         CharacterService characterService = new CharacterService(characterDao);
         return new AttackRequestHandler(
-            new AttackService(characterService, new BotFactory()),
+            new AttackService(characterService, new BotFactory(), db.jdbi().onDemand(BattleHistoryDao.class)),
             new RewardService(db.jdbi(), characterService));
     }
 
@@ -103,6 +108,21 @@ class AttackRequestHandlerTest {
         assertEquals(0L, response.expDelta());
         assertEquals(0, response.eloDelta());
         assertEquals(0, db.battleHistoryRowCount(), "nothing partially committed");
+    }
+
+    @Test
+    void rejectsAnAttackOnceTheDailyBattleCapIsReached() {
+        seedRewardTables();
+        for (int i = 0; i < 5; i++) {
+            db.withBattleHistory(CHARACTER_A, false, Instant.now());
+        }
+        FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
+
+        handler().handle(connection, new AttackRequest(CHARACTER_A));
+
+        AttackRejectedResponse response = connection.onlySentPacket(AttackRejectedResponse.class);
+        assertEquals(MessageCode.DAILY_BATTLE_CAP_REACHED.name(), response.reason());
+        assertEquals(5, db.battleHistoryRowCount(), "a capped attack resolves no battle and records nothing new");
     }
 
     @Test

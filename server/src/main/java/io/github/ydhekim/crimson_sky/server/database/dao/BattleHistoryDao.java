@@ -36,4 +36,12 @@ public interface BattleHistoryDao {
      */
     @SqlQuery("SELECT COUNT(*) FROM battle_history WHERE character_id = :characterId AND won = true AND created_at > :since")
     int countWins(@Bind("characterId") long characterId, @Bind("since") Instant since);
+
+    /**
+     * How many battles (win or lose) {@code characterId} has fought since {@code since} — the daily
+     * battle cap check (system design §20). Unlike {@link #countWins}, no {@code won} filter: every
+     * attempt counts against the cap, not just wins.
+     */
+    @SqlQuery("SELECT COUNT(*) FROM battle_history WHERE character_id = :characterId AND created_at > :since")
+    int countBattlesSince(@Bind("characterId") long characterId, @Bind("since") Instant since);
 }

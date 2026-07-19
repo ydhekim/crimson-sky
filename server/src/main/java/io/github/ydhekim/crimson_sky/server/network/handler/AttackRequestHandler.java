@@ -1,6 +1,8 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.common.model.MessageCode;
+import io.github.ydhekim.crimson_sky.common.network.packet.AttackRejectedResponse;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
@@ -51,6 +53,14 @@ public class AttackRequestHandler implements RequestHandler<AttackRequest> {
             log.info("Rejected attack request: character " + request.characterId()
                 + " is not owned by Account ID: " + connection.account.id()
                 + " (Connection ID: " + connection.getID() + ")");
+            return;
+        }
+
+        int remaining = attackService.remainingDailyBattles(request.characterId());
+        if (remaining <= 0) {
+            log.info("Rejected attack request: daily battle cap reached for character " + request.characterId()
+                + " (Connection ID: " + connection.getID() + ")");
+            connection.sendTCP(new AttackRejectedResponse(MessageCode.DAILY_BATTLE_CAP_REACHED.name()));
             return;
         }
 

@@ -22,6 +22,15 @@ public interface AccountDao {
     @SqlUpdate("UPDATE accounts SET global_currency = global_currency + :goldDelta WHERE id = :accountId")
     void addGlobalCurrency(@Bind("accountId") long accountId, @Bind("goldDelta") int goldDelta);
 
+    /**
+     * Grants (or revokes, with a negative {@code delta}) bonus character slots (system design §20/Q3) by
+     * incrementing the same {@code max_slots} column the client already sees — there is no separate bonus
+     * field. An atomic increment, mirroring {@link #addGlobalCurrency}. Nothing calls this yet; it exists
+     * so a future IAP/achievement/quest grant path has somewhere to write.
+     */
+    @SqlUpdate("UPDATE accounts SET max_slots = max_slots + :delta WHERE id = :accountId")
+    void addCharacterSlots(@Bind("accountId") long accountId, @Bind("delta") int delta);
+
     /** The account-wide gold wallet (system design §16), read to price a skill-tree spend. */
     @SqlQuery("SELECT global_currency FROM accounts WHERE id = :accountId")
     Optional<Long> getGlobalCurrency(@Bind("accountId") long accountId);
