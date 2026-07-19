@@ -167,9 +167,22 @@ class RewardServiceTest {
         assertEquals(ATTACKER, row.characterId());
         assertEquals(OPPONENT, row.opponentCharacterId().longValue());
         assertFalse(row.opponentIsBot());
+        assertTrue(row.won(), "a won battle records won = true — the real outcome, not inferred from gold (§19)");
         assertEquals(25, row.goldDelta());
         assertEquals(50L, row.experienceDelta());
         assertEquals(16, row.eloDelta());
+    }
+
+    @Test
+    void recordsTheRealOutcomeOfALostBattle() {
+        // The other half of the §0 gap: a loss must record won = false, not be left inferable from the
+        // consolation gold happening to equal LOSS_GOLD today.
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+
+        rewardService.applyRewards(realFight(false));
+
+        assertFalse(db.onlyBattleHistoryRow().won(), "a lost battle records won = false");
     }
 
     @Test
@@ -181,6 +194,7 @@ class RewardServiceTest {
         TestDatabase.BattleHistoryRow row = db.onlyBattleHistoryRow();
         assertNull(row.opponentCharacterId(), "a bot has no row in `characters` to point at");
         assertTrue(row.opponentIsBot(), "bot-ness is recorded server-side, for analytics only");
+        assertTrue(row.won(), "a won bot fight records won = true, same as a real one");
     }
 
     @Test
