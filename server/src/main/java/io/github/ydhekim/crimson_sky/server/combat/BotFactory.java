@@ -123,9 +123,9 @@ public class BotFactory {
     private static final Weapon WARHAMMER = new Weapon(3L, "Warhammer", "", Rarity.RARE, 40f, 15, 45, 25, 20, 20);
 
     // ACTIVE skills leave the three trailing passive fields empty (null, 0, null), per §16's Skill shape.
-    private static final Skill SPARK = new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40, null, 0, null);
-    private static final Skill LIGHTNING_BOLT = new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60, null, 0, null);
-    private static final Skill METEOR = new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110, null, 0, null);
+    private static final Skill SPARK = new Skill(1L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40, null, 0, null, null, 0, 0, 0);
+    private static final Skill LIGHTNING_BOLT = new Skill(2L, "Lightning Bolt", "", SkillType.ACTIVE, 28, Difficulty.MEDIUM, 30, 60, null, 0, null, null, 0, 0, 0);
+    private static final Skill METEOR = new Skill(4L, "Meteor", "", SkillType.ACTIVE, 70, Difficulty.MYTHIC, 70, 110, null, 0, null, null, 0, 0, 0);
 
     // Health (§18) is full on every bot pet, for the same reason durability is full on every bot weapon: a
     // bot is synthesized fresh for one battle and has no inventory to wear down, so its pet must never

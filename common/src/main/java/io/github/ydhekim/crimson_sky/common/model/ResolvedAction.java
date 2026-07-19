@@ -10,6 +10,11 @@ package io.github.ydhekim.crimson_sky.common.model;
  * {@link io.github.ydhekim.crimson_sky.combat.ActionResolver decision layer} produces entries with
  * {@code damage = 0}, and the battle turn resolution fills in the real total.
  *
+ * <p><b>{@code CONSUMABLE} reads {@code damage} differently</b> (system design §18): a potion deals none,
+ * so the field carries the amount <i>restored to the actor</i> instead. Its decision layer
+ * ({@link io.github.ydhekim.crimson_sky.combat.ConsumableResolver}) fills the value in immediately rather
+ * than leaving it at {@code 0} — a potion's restore amount is flat, with no mitigation math to wait for.
+ *
  * <p>{@code itemId} identifies <b>which</b> record the entry acted with — {@code source}'s category
  * alone can't, once a pouch holds several weapons or skills (system design §17). It carries the
  * {@code Weapon}/{@code Skill}/{@code Pet} id for those sources, and {@code 0} for {@code PUNCH} (no

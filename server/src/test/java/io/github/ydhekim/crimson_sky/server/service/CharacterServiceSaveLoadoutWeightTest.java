@@ -48,7 +48,7 @@ class CharacterServiceSaveLoadoutWeightTest {
 
     /** A passive worth +10 carry capacity — enough to admit a third 12-weight weapon (30 → 40 vs 36). */
     private static final Skill PACK_MULE = new Skill(1000L, "Pack Mule", "", SkillType.PASSIVE, 0,
-        Difficulty.EASY, 0, 0, PassiveEffectType.WEIGHT_CAPACITY_BONUS, 10, null);
+        Difficulty.EASY, 0, 0, PassiveEffectType.WEIGHT_CAPACITY_BONUS, 10, null, null, 0, 0, 0);
 
     private FakeCharacterDao dao;
 
@@ -114,7 +114,7 @@ class CharacterServiceSaveLoadoutWeightTest {
         Array<Skill> skills = new Array<>();
         for (int i = 0; i < 5; i++) {
             skills.add(new Skill(2000L + i, "S" + i, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-                PassiveEffectType.CRIT_CHANCE_BONUS, 1, null));
+                PassiveEffectType.CRIT_CHANCE_BONUS, 1, null, null, 0, 0, 0));
         }
         // Not owned, so this would fail the *ownership* check — proving weight didn't reject it first.
         ServiceResult<Loadout> result = save(loadout(new Array<>(), skills));

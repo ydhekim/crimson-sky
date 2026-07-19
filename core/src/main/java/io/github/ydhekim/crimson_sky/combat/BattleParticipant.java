@@ -3,6 +3,7 @@ package io.github.ydhekim.crimson_sky.combat;
 import com.badlogic.ashley.core.ComponentMapper;
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Loadout;
@@ -13,6 +14,7 @@ import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import io.github.ydhekim.crimson_sky.ecs.CharacterMapper;
 import io.github.ydhekim.crimson_sky.ecs.component.BaseStatsComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.BattleStateComponent;
+import io.github.ydhekim.crimson_sky.ecs.component.ConsumableSlotComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.HealthComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.LoadoutComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.ManaComponent;
@@ -48,6 +50,7 @@ public class BattleParticipant {
     private static final ComponentMapper<WeaponSlotComponent> WEAPONS = ComponentMapper.getFor(WeaponSlotComponent.class);
     private static final ComponentMapper<SkillSlotComponent> SKILLS = ComponentMapper.getFor(SkillSlotComponent.class);
     private static final ComponentMapper<PetSlotComponent> PET = ComponentMapper.getFor(PetSlotComponent.class);
+    private static final ComponentMapper<ConsumableSlotComponent> CONSUMABLES = ComponentMapper.getFor(ConsumableSlotComponent.class);
     private static final ComponentMapper<PassiveModifiersComponent> PASSIVES = ComponentMapper.getFor(PassiveModifiersComponent.class);
     private static final ComponentMapper<BattleStateComponent> BATTLE_STATE = ComponentMapper.getFor(BattleStateComponent.class);
     private static final ComponentMapper<TurnResultComponent> TURN_RESULT = ComponentMapper.getFor(TurnResultComponent.class);
@@ -63,7 +66,8 @@ public class BattleParticipant {
      * Assembles a battle-ready participant from a persisted {@link Character}: base entity via
      * {@link CharacterMapper} (id/name/health/mana/stamina/stats/base-stats/loadout), then the
      * battle-only pouches (all loadout weapons in order, at their <i>inventory</i> durability; ACTIVE
-     * skills only, PASSIVE filtered out per §4.4; the first loadout pet at its <i>inventory</i> health), the
+     * skills in the priority pouch and CONSUMABLE skills in their own, at their <i>inventory</i> charges,
+     * PASSIVE in neither per §4.4; the first loadout pet at its <i>inventory</i> health), the
      * {@link PassiveModifiersComponent} derived from equipped PASSIVE skills (§16), and a zeroed
      * {@link BattleStateComponent}. The entity is added to {@code engine} so its lifecycle is owned there.
      *
@@ -84,13 +88,15 @@ public class BattleParticipant {
      *
      * <p><b>Pet health comes from Inventory too (§18)</b>, for exactly the same reasons and through the
      * same shape of cross-reference — pet wear was designed as durability's mirror, so it resolves the
-     * Loadout-vs-Inventory drift the same way rather than inventing a second answer.
+     * Loadout-vs-Inventory drift the same way rather than inventing a second answer. <b>Potion charges
+     * likewise (§18)</b>: a client could otherwise hand back a full flask the database knows is empty.
      */
     public static BattleParticipant fromCharacter(Engine engine, Character character) {
         Entity entity = CharacterMapper.createEntity(engine, character);
 
         WeaponSlotComponent weaponSlot = engine.createComponent(WeaponSlotComponent.class);
         SkillSlotComponent skillSlot = engine.createComponent(SkillSlotComponent.class);
+        ConsumableSlotComponent consumableSlot = engine.createComponent(ConsumableSlotComponent.class);
         PetSlotComponent petSlot = engine.createComponent(PetSlotComponent.class);
         PassiveModifiersComponent passiveModifiers = engine.createComponent(PassiveModifiersComponent.class);
         StatsComponent statsCmp = STATS.get(entity);
@@ -108,7 +114,12 @@ public class BattleParticipant {
                 for (Skill skill : loadout.skills()) {
                     if (skill.type() == SkillType.ACTIVE) { // passives never enter the priority pouch
                         skillSlot.equipped.add(skill);
+                    } else if (skill.type() == SkillType.CONSUMABLE) {
+                        Skill crossReferenced = atInventoryCharges(skill, character.inventory());
+                        consumableSlot.equipped.add(crossReferenced);
+                        consumableSlot.remainingCharges.add(crossReferenced.charges());
                     }
+                    // PASSIVE skills are folded in below, via PassiveEffects — they enter no pouch at all.
                 }
             }
             if (loadout.pets() != null && loadout.pets().size > 0) {
@@ -127,6 +138,7 @@ public class BattleParticipant {
         }
         entity.add(weaponSlot);
         entity.add(skillSlot);
+        entity.add(consumableSlot);
         entity.add(petSlot);
         entity.add(passiveModifiers);
         entity.add(engine.createComponent(BattleStateComponent.class));
@@ -170,6 +182,31 @@ public class BattleParticipant {
         return equipped;
     }
 
+    /**
+     * {@code equipped} carrying the charges its {@code inventory} counterpart (same id) currently has — the
+     * §18 source-of-truth cross-reference, the same shape as {@link #atInventoryDurability} and
+     * {@link #atInventoryPetHealth}. Falls back to {@code equipped}'s own value when the id isn't owned (a
+     * bot's synthesized loadout, per {@link #fromCharacter}).
+     *
+     * <p>Indexed rather than for-each, unlike its two siblings: this is called from <i>inside</i> the loop
+     * over {@code loadout.skills()}, and a {@code gdx.utils.Array} caches one iterator — so a caller that
+     * handed the same array as both loadout and inventory (a fixture shortcut, not a shape real data takes)
+     * would blow up on nested iteration rather than quietly reading what it meant to.
+     */
+    private static Skill atInventoryCharges(Skill equipped, Inventory inventory) {
+        if (inventory == null || inventory.skills() == null) {
+            return equipped;
+        }
+        Array<Skill> owned = inventory.skills();
+        for (int i = 0; i < owned.size; i++) {
+            Skill candidate = owned.get(i);
+            if (candidate.id() == equipped.id() && candidate.type() == SkillType.CONSUMABLE) {
+                return equipped.withCharges(candidate.charges());
+            }
+        }
+        return equipped;
+    }
+
     public Entity entity() {
         return entity;
     }
@@ -204,6 +241,10 @@ public class BattleParticipant {
 
     public PetSlotComponent pet() {
         return PET.get(entity);
+    }
+
+    public ConsumableSlotComponent consumables() {
+        return CONSUMABLES.get(entity);
     }
 
     public PassiveModifiersComponent passiveModifiers() {

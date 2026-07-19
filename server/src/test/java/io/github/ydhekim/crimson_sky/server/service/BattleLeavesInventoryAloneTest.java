@@ -1,6 +1,9 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
+import com.badlogic.gdx.utils.Array;
+import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
+import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Tameness;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
@@ -177,6 +180,39 @@ class BattleLeavesInventoryAloneTest {
         assertTrue(after.contains("\"name\":\"Bear\""));
     }
 
+    @Test
+    void aDrunkPotionsChargeDecrementReachesInventoryThroughThatSamePath() {
+        // O2's turn to prove §18's standing rule, and the last of the four inventory mutations that rule now
+        // covers: a potion's charge decrement is a fifth in-memory transformation before the *same*
+        // `updateInventory` call, so `onlyTheSanctionedGrantPathCanReachTheStoredItems` below still names
+        // exactly two writers. The turn log is handed over directly rather than fought out of a real battle —
+        // what this asserts is the *path*, and RewardServiceConsumablePersistenceTest owns the arithmetic.
+        String inventory = "{\"weapons\":[{\"id\":1,\"name\":\"Testing Hammer\",\"maxDurability\":20,"
+            + "\"currentDurability\":20}],"
+            + "\"skills\":[{\"id\":100,\"name\":\"Small Health Potion\",\"type\":\"CONSUMABLE\","
+            + "\"restoresResource\":\"HEALTH\",\"thresholdPercent\":50,\"restoreAmount\":100,"
+            + "\"charges\":3}],\"pets\":[],\"consumables\":{}}";
+
+        FakeCharacterDao dao = new FakeCharacterDao()
+            .with(CombatFixtures.character(ATTACKER, ACCOUNT_A, "Ayla"), ACCOUNT_A, 1000)
+            .with(CombatFixtures.character(OPPONENT, ACCOUNT_B, "Boran"), ACCOUNT_B, 1000);
+        TestDatabase potionDb = TestDatabase.create()
+            .withAccount(ACCOUNT_A, 0L).withAccount(ACCOUNT_B, 0L)
+            .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
+            .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
+        RewardService potionReward = new RewardService(potionDb.jdbi(), new CharacterService(dao));
+
+        potionReward.applyRewards(new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true,
+            Array.with(Array.with(
+                new ResolvedAction(ActionSource.CONSUMABLE, "Small Health Potion", 1, false, 100, 100L)))));
+
+        String after = potionDb.inventoryJsonOf(ATTACKER);
+        assertTrue(after.contains("\"charges\":2"), "the drunk potion's charge landed: 3 → 2 (§18)");
+        assertTrue(after.contains("Small Health Potion"),
+            "spending a charge never removes the potion itself — even at 0 it stays owned (§8)");
+        assertTrue(after.contains("Testing Hammer"), "and it took no other stored item away either");
+    }
+
     /** Weapon entries in a stored inventory blob, counted by the one key every weapon has. */
     private static int weaponCountOf(String inventoryJson) {
         return inventoryJson.split("\"id\":", -1).length - 1;
@@ -198,9 +234,10 @@ class BattleLeavesInventoryAloneTest {
         // going wrong, not the test.
         //
         // Still exactly two after Epic O, which is the first real test of that rule: §18's pet-health wear,
-        // the shop's repairs and its consumable purchases are four more mutations of `inventory` and needed
-        // zero new names here. The empirical half is
-        // `petWearAndEveryShopWriteReachInventoryThroughTheSameSanctionedPath` above.
+        // its potion-charge depletion, the shop's repairs and its consumable purchases are five more
+        // mutations of `inventory` and needed zero new names here. The empirical halves are
+        // `petWearAndEveryShopWriteReachInventoryThroughTheSameSanctionedPath` and
+        // `aDrunkPotionsChargeDecrementReachesInventoryThroughThatSamePath` above.
         boolean sawSanctionedInventoryWriter = false;
         boolean sawSanctionedLoadoutWriter = false;
         for (Method method : CharacterDao.class.getDeclaredMethods()) {
