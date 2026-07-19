@@ -186,7 +186,7 @@ public class RewardService {
                     .addGlobalCurrency(accountId, outcome.goldDelta());
                 handle.attach(BattleHistoryDao.class).insert(
                     result.characterId(), result.opponentCharacterId(), result.opponentIsBot(),
-                    outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta());
+                    result.won(), outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta());
 
                 // Only touch the inventory column when something actually changed it — a read-modify-write
                 // under the row lock, in the same transaction, so an item grant or a durability decrement

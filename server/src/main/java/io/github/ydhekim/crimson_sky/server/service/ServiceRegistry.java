@@ -11,6 +11,7 @@ public class ServiceRegistry {
     private final RewardService rewardService;
     private final SkillTreeService skillTreeService;
     private final ShopService shopService;
+    private final QuestService questService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -36,6 +37,11 @@ public class ServiceRegistry {
         // Same reason again: a repair or purchase spans `characters` (inventory) and `accounts` (gold)
         // atomically, so it needs the raw Jdbi, not onDemand proxies.
         this.shopService = new ShopService(dbManager.getJdbi(), characterService);
+
+        // Same reason again (system design §19): a claim spans `quest_claims` and either
+        // `accounts.global_currency` or `characters.inventory` atomically, so it needs the raw Jdbi, not
+        // onDemand proxies. It attaches CharacterDao/AccountDao/BattleHistoryDao/QuestClaimDao to that Jdbi.
+        this.questService = new QuestService(dbManager.getJdbi(), characterService);
 
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
@@ -69,6 +75,10 @@ public class ServiceRegistry {
 
     public ShopService getShopService() {
         return shopService;
+    }
+
+    public QuestService getQuestService() {
+        return questService;
     }
 
     public LocalizationService getLocalizationService() {

@@ -10,6 +10,8 @@ import org.jdbi.v3.jackson2.Jackson2Config;
 import org.jdbi.v3.jackson2.Jackson2Plugin;
 import org.jdbi.v3.sqlobject.SqlObjectPlugin;
 
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -75,10 +77,20 @@ public final class TestDatabase {
                 + "character_id INTEGER NOT NULL REFERENCES characters (id), "
                 + "opponent_character_id INTEGER REFERENCES characters (id), "
                 + "opponent_is_bot BOOLEAN NOT NULL DEFAULT FALSE, "
+                + "won BOOLEAN NOT NULL DEFAULT FALSE, "
                 + "gold_delta INTEGER NOT NULL, "
                 + "experience_delta BIGINT NOT NULL, "
                 + "elo_delta INTEGER NOT NULL, "
                 + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            // Quest claim ledger (Epic P / system design §19, V11). The real UNIQUE triple is modelled so a
+            // second daily/weekly claim of the same period collides exactly as it would in production.
+            handle.execute("CREATE TABLE quest_claims ("
+                + "id SERIAL PRIMARY KEY, "
+                + "character_id INTEGER NOT NULL REFERENCES characters (id), "
+                + "quest_id VARCHAR(64) NOT NULL, "
+                + "period_start TIMESTAMP NOT NULL, "
+                + "claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "UNIQUE (character_id, quest_id, period_start))");
         });
 
         return new TestDatabase(jdbi);
@@ -171,7 +183,7 @@ public final class TestDatabase {
     /** The single {@code battle_history} row, for the tests that write exactly one. */
     public BattleHistoryRow onlyBattleHistoryRow() {
         return jdbi.withHandle(handle -> handle
-            .select("SELECT character_id, opponent_character_id, opponent_is_bot, gold_delta, "
+            .select("SELECT character_id, opponent_character_id, opponent_is_bot, won, gold_delta, "
                 + "experience_delta, elo_delta FROM battle_history")
             .map((rs, ctx) -> {
                 long opponentId = rs.getLong("opponent_character_id");
@@ -180,11 +192,54 @@ public final class TestDatabase {
                     rs.getLong("character_id"),
                     opponentWasNull ? null : opponentId,
                     rs.getBoolean("opponent_is_bot"),
+                    rs.getBoolean("won"),
                     rs.getInt("gold_delta"),
                     rs.getLong("experience_delta"),
                     rs.getInt("elo_delta"));
             })
             .one());
+    }
+
+    /**
+     * Seeds one {@code battle_history} row directly (Epic P / system design §19 quest-counting tests), with
+     * an explicit {@code won} outcome and {@code createdAt} instant so a test can place wins and losses on
+     * either side of a period boundary. Bound as a bot fight with zero deltas — only {@code won} and
+     * {@code created_at} matter to a win count.
+     */
+    public TestDatabase withBattleHistory(long characterId, boolean won, Instant createdAt) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO battle_history (character_id, opponent_is_bot, won, gold_delta, experience_delta, "
+                + "elo_delta, created_at) VALUES (?, TRUE, ?, 0, 0, 0, ?)",
+            characterId, won, Timestamp.from(createdAt)));
+        return this;
+    }
+
+    /**
+     * Seeds one {@code quest_claims} row (Epic P / system design §19). {@code claimed_at} defaults to now, so
+     * a claim seeded this way counts toward today's repeatable cap; pass an explicit {@code periodStart} that
+     * differs per call for repeatable claims so they never collide on the {@code UNIQUE} triple.
+     */
+    public TestDatabase withQuestClaim(long characterId, String questId, Instant periodStart) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO quest_claims (character_id, quest_id, period_start) VALUES (?, ?, ?)",
+            characterId, questId, Timestamp.from(periodStart)));
+        return this;
+    }
+
+    /** How many {@code quest_claims} rows a character holds for {@code questId} (any period). */
+    public int questClaimCountOf(long characterId, String questId) {
+        return queryOne("SELECT COUNT(*) FROM quest_claims WHERE character_id = ? AND quest_id = ?",
+            Integer.class, characterId, questId);
+    }
+
+    /**
+     * How many <b>distinct</b> {@code period_start} values a character's claims of {@code questId} carry.
+     * The repeatable quest gives each claim its own moment, so two same-day repeatable claims must show two
+     * distinct period_starts here while {@link #questClaimCountOf} shows two rows under the one quest id.
+     */
+    public int distinctQuestClaimPeriodCountOf(long characterId, String questId) {
+        return queryOne("SELECT COUNT(DISTINCT period_start) FROM quest_claims WHERE character_id = ? AND quest_id = ?",
+            Integer.class, characterId, questId);
     }
 
     private <T> T queryOne(String sql, Class<T> type, Object... args) {
@@ -197,6 +252,6 @@ public final class TestDatabase {
 
     /** {@code opponentCharacterId} is {@code null} exactly for a bot fight, mirroring the real column. */
     public record BattleHistoryRow(long characterId, Long opponentCharacterId, boolean opponentIsBot,
-                                   int goldDelta, long experienceDelta, int eloDelta) {
+                                   boolean won, int goldDelta, long experienceDelta, int eloDelta) {
     }
 }

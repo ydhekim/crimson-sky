@@ -141,5 +141,16 @@ public class KryoConfig {
         // every positional ID above is untouched (system design §5, append-only); SkillType and ActionSource
         // each gained a trailing constant, which is append-only within the enum for the same reason.
         kryo.register(ResourceType.class);
+
+        // Quests (Epic P / system design §19) — quest status and claim. Appended after O2's ResourceType so
+        // every positional ID above is untouched (system design §5, append-only). QuestProgress rides
+        // inside a QuestStatusResponse's Array and QuestClaimResult inside a ClaimQuestResponse, so both are
+        // registered here (before the packets) the same way ResolvedAction is registered before AttackResponse.
+        kryo.register(QuestProgress.class, new RecordSerializer<>(QuestProgress.class));
+        kryo.register(QuestClaimResult.class, new RecordSerializer<>(QuestClaimResult.class));
+        kryo.register(QuestStatusRequest.class, new RecordSerializer<>(QuestStatusRequest.class));
+        kryo.register(QuestStatusResponse.class, new RecordSerializer<>(QuestStatusResponse.class));
+        kryo.register(ClaimQuestRequest.class, new RecordSerializer<>(ClaimQuestRequest.class));
+        kryo.register(ClaimQuestResponse.class, new RecordSerializer<>(ClaimQuestResponse.class));
     }
 }
