@@ -33,12 +33,12 @@ class BattleParticipantPassivesTest {
 
     private static Skill statPassive(long id, StatName stat, int magnitude) {
         return new Skill(id, "Passive " + id, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-            PassiveEffectType.STAT_BONUS, magnitude, stat);
+            PassiveEffectType.STAT_BONUS, magnitude, stat, null, 0, 0, 0);
     }
 
     private static Skill flatPassive(long id, PassiveEffectType effect, int magnitude) {
         return new Skill(id, "Passive " + id, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-            effect, magnitude, null);
+            effect, magnitude, null, null, 0, 0, 0);
     }
 
     private static Character character(Array<Skill> skills) {

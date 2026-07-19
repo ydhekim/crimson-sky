@@ -25,11 +25,11 @@ class PassiveEffectsTest {
 
     private static Skill passive(long id, PassiveEffectType effect, int magnitude, StatName stat) {
         return new Skill(id, "Passive " + id, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-            effect, magnitude, stat);
+            effect, magnitude, stat, null, 0, 0, 0);
     }
 
     private static Skill active(long id) {
-        return new Skill(id, "Active " + id, "", SkillType.ACTIVE, 10, Difficulty.EASY, 5, 10, null, 0, null);
+        return new Skill(id, "Active " + id, "", SkillType.ACTIVE, 10, Difficulty.EASY, 5, 10, null, 0, null, null, 0, 0, 0);
     }
 
     private static Loadout loadout(Array<Skill> skills) {
@@ -53,7 +53,7 @@ class PassiveEffectsTest {
         // An ACTIVE skill carries meaningless passive fields (§16's Skill shape) — reading them as bonuses
         // would silently inflate every loadout, so type() is what gates, not the magnitude being non-zero.
         Skill activeWithJunk = new Skill(9L, "Spark", "", SkillType.ACTIVE, 12, Difficulty.EASY, 20, 40,
-            PassiveEffectType.WEIGHT_CAPACITY_BONUS, 999, null);
+            PassiveEffectType.WEIGHT_CAPACITY_BONUS, 999, null, null, 0, 0, 0);
         Skill malformed = passive(10L, null, 50, null); // no effect type — nothing to fold
 
         Loadout loadout = loadout(Array.with(active(8L), activeWithJunk, malformed));

@@ -45,7 +45,7 @@ class SaveLoadoutRequestHandlerTest {
 
     private static final Weapon SWORD = new Weapon(1L, "Sword", "", Rarity.COMMON, 2f, 10, 20, 5, 20, 20);
     private static final Skill IRON_GRIP = new Skill(1000L, "Iron Grip", "", SkillType.PASSIVE, 0,
-        Difficulty.EASY, 0, 0, PassiveEffectType.STAT_BONUS, 2, StatName.STRENGTH);
+        Difficulty.EASY, 0, 0, PassiveEffectType.STAT_BONUS, 2, StatName.STRENGTH, null, 0, 0, 0);
 
     private FakeCharacterDao dao;
 
@@ -112,7 +112,7 @@ class SaveLoadoutRequestHandlerTest {
         Array<Skill> sixSkills = new Array<>();
         for (int i = 0; i < 6; i++) {
             sixSkills.add(new Skill(2000L + i, "S" + i, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-                PassiveEffectType.CRIT_CHANCE_BONUS, 1, null));
+                PassiveEffectType.CRIT_CHANCE_BONUS, 1, null, null, 0, 0, 0));
         }
         handler().handle(connection, new SaveLoadoutRequest(CHARACTER_A,
             new Loadout(new Array<>(), sixSkills, new Array<>())));

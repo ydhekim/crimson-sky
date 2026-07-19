@@ -8,6 +8,7 @@ import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.Rarity;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
+import io.github.ydhekim.crimson_sky.common.model.Skill;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 
@@ -56,6 +58,10 @@ import java.util.Set;
  * this battle loses a point of health. Deliberately not a new write path — it is another in-memory
  * transformation of the same locked blob before the same {@code updateInventory} call, which is exactly
  * the rule §18 set for every feature that mutates {@code inventory} from N2 onward.
+ *
+ * <p><b>And a third, in a deliberately different shape</b> (O2 / §18): every potion that triggered spends a
+ * charge <i>per trigger</i>, so it is tallied rather than merely noted (see
+ * {@link #consumableTriggerCounts}). Same locked blob, same one write.
  */
 public class RewardService {
 
@@ -164,11 +170,12 @@ public class RewardService {
             base.goldDelta(), base.expDelta(), base.eloDelta(),
             base.skillPointsGained(), levelsGained, statPointsGained, bonusRewardGranted);
 
-        // Durability (N2 / §17) and pet health (O3 / §18): which of the attacker's items were used at all
-        // this battle. Decided here, before any write, for the same reason the milestone roll is — the whole
-        // outcome is known first.
+        // Durability (N2 / §17), pet health (O3 / §18) and potion charges (O2 / §18): which of the attacker's
+        // items were used this battle, and — for potions alone — how many times. Decided here, before any
+        // write, for the same reason the milestone roll is: the whole outcome is known first.
         Set<Long> firedWeaponIds = firedWeaponIds(result);
         Set<Long> firedPetIds = firedPetId(result);
+        Map<Long, Integer> consumableTriggerCounts = consumableTriggerCounts(result);
 
         try {
             jdbi.useTransaction(handle -> {
@@ -187,8 +194,10 @@ public class RewardService {
                 // exception). Both transformations share the one read and the one write: §18 makes this
                 // explicit — every feature that mutates `inventory` from here on is a different in-memory
                 // transformation before the same `updateInventory` call, not a new write path.
-                if (!bonusWeapons.isEmpty() || !firedWeaponIds.isEmpty() || !firedPetIds.isEmpty()) {
-                    updateInventory(characterDao, result.characterId(), firedWeaponIds, firedPetIds, bonusWeapons);
+                if (!bonusWeapons.isEmpty() || !firedWeaponIds.isEmpty() || !firedPetIds.isEmpty()
+                    || !consumableTriggerCounts.isEmpty()) {
+                    updateInventory(characterDao, result.characterId(), firedWeaponIds, firedPetIds,
+                        consumableTriggerCounts, bonusWeapons);
                 }
             });
         } catch (Exception e) {
@@ -253,7 +262,8 @@ public class RewardService {
 
     /**
      * The attacker's stored inventory, read under the row lock, transformed by all of this battle's
-     * effects, and written back once (§15's item grant, §17's durability wear, §18's pet-health wear).
+     * effects, and written back once (§15's item grant, §17's durability wear, §18's pet-health wear and
+     * potion-charge depletion).
      *
      * <p>Order is deliberate: existing weapons wear <b>before</b> the grant appends, so a weapon handed
      * out as this battle's milestone bonus is never charged durability for a battle it wasn't carried in.
@@ -268,11 +278,13 @@ public class RewardService {
      * genuinely has something to record.
      */
     private void updateInventory(CharacterDao characterDao, long characterId, Set<Long> firedWeaponIds,
-                                 Set<Long> firedPetIds, List<Weapon> bonusWeapons) {
+                                 Set<Long> firedPetIds, Map<Long, Integer> consumableTriggerCounts,
+                                 List<Weapon> bonusWeapons) {
         Inventory inventory = characterDao.getInventoryForUpdate(characterId)
             .orElseGet(() -> new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()));
         Array<Weapon> weapons = inventory.weapons() != null ? inventory.weapons() : new Array<>();
         Array<Pet> pets = inventory.pets() != null ? inventory.pets() : new Array<>();
+        Array<Skill> skills = inventory.skills() != null ? inventory.skills() : new Array<>();
 
         boolean changed = false;
         for (int i = 0; i < weapons.size; i++) {
@@ -289,16 +301,50 @@ public class RewardService {
                 changed = true;
             }
         }
+        for (int i = 0; i < skills.size; i++) {
+            Skill skill = skills.get(i);
+            Integer triggers = consumableTriggerCounts.get(skill.id());
+            if (triggers != null && skill.charges() > 0) {
+                skills.set(i, skill.consumed(triggers)); // −1 per actual trigger, floored at 0 (§18)
+                changed = true;
+            }
+        }
         for (Weapon weapon : bonusWeapons) {
             weapons.add(weapon);
             changed = true;
         }
 
         if (changed) {
-            // The shop's consumables ride through untouched: a battle never mutates them (§18).
+            // The shop's `consumables` map rides through untouched despite the name: it is stock the shop
+            // sells, unrelated to a potion's charges, and a battle never spends it (§18).
             characterDao.updateInventory(characterId,
-                new Inventory(weapons, inventory.skills(), pets, inventory.consumables()));
+                new Inventory(weapons, skills, pets, inventory.consumables()));
         }
+    }
+
+    /**
+     * How many times each of the attacker's equipped potions triggered this battle (§18) — a tally, not a
+     * set, which is the one place potions diverge from the shape {@link #firedWeaponIds}/{@link #firedPetId}
+     * share. Durability and pet health are spent per <b>battle</b> however often the item acted; a potion's
+     * charges are spent per <b>trigger</b>, because a long fight can genuinely cross the threshold more than
+     * once and each crossing is a real drink.
+     *
+     * <p>{@code result.turns()} is the attacker's own turn history — never the opponent's — so this can only
+     * ever spend the charges of the character being rewarded.
+     */
+    static Map<Long, Integer> consumableTriggerCounts(AttackResult result) {
+        Map<Long, Integer> counts = new HashMap<>();
+        if (result.turns() == null) {
+            return counts;
+        }
+        for (Array<ResolvedAction> turn : result.turns()) {
+            for (ResolvedAction action : turn) {
+                if (action.source() == ActionSource.CONSUMABLE && action.itemId() != 0L) {
+                    counts.merge(action.itemId(), 1, Integer::sum);
+                }
+            }
+        }
+        return counts;
     }
 
     /**

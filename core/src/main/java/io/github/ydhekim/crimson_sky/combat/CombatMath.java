@@ -106,4 +106,14 @@ public final class CombatMath {
     public static boolean isPetUsable(Pet pet) {
         return pet.currentHealth() > 0;
     }
+
+    /**
+     * Potion-branch convenience: has {@code current} dropped to or below {@code thresholdPercent} of
+     * {@code max} (§18)? At-or-below, so a potion set to 50% fires at exactly half. Cross-multiplied rather
+     * than divided so the comparison is exact at every percentage — a float ratio would make "50% of 100"
+     * a question of rounding. A {@code max} of 0 is never "below": there is no pool to be low on.
+     */
+    public static boolean isBelowThreshold(int current, int max, int thresholdPercent) {
+        return max > 0 && (long) current * 100 <= (long) thresholdPercent * max;
+    }
 }

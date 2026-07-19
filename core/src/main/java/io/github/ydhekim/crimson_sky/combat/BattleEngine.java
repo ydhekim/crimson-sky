@@ -7,6 +7,7 @@ import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
+import io.github.ydhekim.crimson_sky.ecs.component.ConsumableSlotComponent;
 import io.github.ydhekim.crimson_sky.ecs.component.TurnResultComponent;
 
 import java.util.SplittableRandom;
@@ -16,8 +17,9 @@ import java.util.SplittableRandom;
  * role §4 defers until two-sided battles exist, implemented as a plain orchestrator rather than an
  * {@code IteratingSystem} because per-hit win-condition checks and priority across two entities do
  * not fit the per-entity iteration model. It composes the pure decision layer
- * ({@link ActionResolver}/{@link PetResolver}) with per-hit damage application
- * ({@link DamageCalculator}) and the shared {@link ResultCompiler} ordering.
+ * ({@link ConsumableResolver}/{@link ActionResolver}/{@link PetResolver}, in the order a turn asks them)
+ * with per-hit damage application ({@link DamageCalculator}) and the shared {@link ResultCompiler}
+ * ordering.
  *
  * <h2>Turn rules</h2>
  * <ul>
@@ -135,30 +137,54 @@ public class BattleEngine {
         return winner;
     }
 
-    /** Builds one combatant's Result Set, applying every hit in order with per-hit dodge + win-check. */
+    /**
+     * Builds one combatant's Result Set, applying every hit in order with per-hit dodge + win-check.
+     *
+     * <p>Step 1 has two mutually exclusive halves since §18: a potion below its threshold fires <b>in place
+     * of</b> the whole weapon/skill cascade, healing instead of hitting. The pet's Step 2 decision is
+     * unaffected either way — it has always run independent of the character's outcome (it acts even after
+     * a Burned cast), and a potion turn is no different.
+     */
     private void resolveResultSet(BattleParticipant attacker, BattleParticipant defender) {
         Stats stats = attacker.statsComponent().stats;
-
-        // Step 1 — character decision, then commit its resource cost.
-        CharacterActionResolution charRes = ActionResolver.chooseCharacterAction(
-            stats, attacker.weapons().equipped, attacker.skills().equipped,
-            attacker.mana().currentMana, attacker.stamina().currentStamina, rng);
-        spendResource(attacker, charRes);
-
-        // Step 2 — pet decision, independent of the character outcome (runs even on a Burned cast).
-        Pet pet = attacker.pet() != null ? attacker.pet().equipped : null;
-        PetActionResolution petRes = PetResolver.choosePetAction(stats, pet, rng);
-        attacker.battleState().petUsedThisTurn = pet != null;
 
         int defenderDef = defender.baseStats().baseDefence;
         int defenderSpeed = defender.statsComponent().stats.speed();
         int defenderDodgeBonus = defender.passiveModifiers().dodgeChanceBonus;
         int attackerCritBonus = attacker.passiveModifiers().critChanceBonus;
 
-        // Step 3 — apply. Character hits first; then pet hits only if the defender is still standing.
-        ResolvedAction characterEntry = applyEntry(
-            charRes.action(), charRes.minAttack(), charRes.maxAttack(), charRes.pathStatValue(),
-            defender, defenderDef, defenderSpeed, defenderDodgeBonus, attackerCritBonus);
+        // Step 1 — the potion check first (§18); the cascade decides only if no potion fired. A potion
+        // heals and burns its charge here, where the cascade would commit its resource cost.
+        ConsumableSlotComponent consumables = attacker.consumables();
+        ConsumableActionResolution potionRes = ConsumableResolver.chooseConsumable(
+            attacker.health().currentHealth, attacker.health().maxHealth,
+            attacker.mana().currentMana, attacker.mana().maxMana,
+            attacker.stamina().currentStamina, attacker.stamina().maxStamina,
+            consumables.equipped, consumables.remainingCharges);
+
+        CharacterActionResolution charRes = null;
+        if (potionRes != null) {
+            applyRestore(attacker, potionRes);
+            consumables.remainingCharges.set(potionRes.equippedIndex(),
+                consumables.remainingCharges.get(potionRes.equippedIndex()) - 1);
+        } else {
+            charRes = ActionResolver.chooseCharacterAction(
+                stats, attacker.weapons().equipped, attacker.skills().equipped,
+                attacker.mana().currentMana, attacker.stamina().currentStamina, rng);
+            spendResource(attacker, charRes);
+        }
+
+        // Step 2 — pet decision, independent of the character outcome (runs even on a Burned cast).
+        Pet pet = attacker.pet() != null ? attacker.pet().equipped : null;
+        PetActionResolution petRes = PetResolver.choosePetAction(stats, pet, rng);
+        attacker.battleState().petUsedThisTurn = pet != null;
+
+        // Step 3 — apply. Character hits first; then pet hits only if the defender is still standing. A
+        // potion's entry is already complete (flat restore, nothing to roll) and lands no hits at all.
+        ResolvedAction characterEntry = potionRes != null
+            ? potionRes.action()
+            : applyEntry(charRes.action(), charRes.minAttack(), charRes.maxAttack(), charRes.pathStatValue(),
+                defender, defenderDef, defenderSpeed, defenderDodgeBonus, attackerCritBonus);
 
         ResolvedAction petEntry = null;
         if (petRes != null && !defender.isDefeated()) {
@@ -200,6 +226,24 @@ public class BattleEngine {
         }
         return new ResolvedAction(entry.source(), entry.label(), entry.frequency(), entry.failed(),
             total, entry.itemId());
+    }
+
+    /**
+     * Tops the named pool back up by the potion's flat {@code restoreAmount}, capped at that pool's max
+     * (§18) — overhealing is simply wasted, never banked above the cap. Nothing is mirrored onto Battle
+     * State: {@code spentMana}/{@code spentStamina} record what the character <i>spent</i> this battle, and a
+     * refill is not a spend.
+     */
+    private void applyRestore(BattleParticipant attacker, ConsumableActionResolution potionRes) {
+        int amount = potionRes.restoreAmount();
+        switch (potionRes.resource()) {
+            case HEALTH -> attacker.health().currentHealth =
+                Math.min(attacker.health().maxHealth, attacker.health().currentHealth + amount);
+            case MANA -> attacker.mana().currentMana =
+                Math.min(attacker.mana().maxMana, attacker.mana().currentMana + amount);
+            case STAMINA -> attacker.stamina().currentStamina =
+                Math.min(attacker.stamina().maxStamina, attacker.stamina().currentStamina + amount);
+        }
     }
 
     /** Draws the committed action's cost from the matching pool and mirrors it onto Battle State. */

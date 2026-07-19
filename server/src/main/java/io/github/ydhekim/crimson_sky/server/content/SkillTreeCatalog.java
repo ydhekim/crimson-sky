@@ -69,11 +69,12 @@ public final class SkillTreeCatalog {
          * The {@link Skill} granted for {@code rank} (1..{@value #MAX_RANK}) — a {@code PASSIVE} whose
          * {@code passiveMagnitude} is the full rank-scaled value ({@code magnitudePerRank × rank}). The
          * ACTIVE-only fields are neutral ({@code manaCost 0}, {@code Difficulty.EASY}, {@code 0..0}
-         * range) since a passive never enters the turn cascade.
+         * range) since a passive never enters the turn cascade, as are the CONSUMABLE-only ones (§18): no
+         * resource, no threshold, no charges — the tree grants no potions.
          */
         public Skill skillAtRank(int rank) {
             return new Skill(skillId, name, "", SkillType.PASSIVE, 0, Difficulty.EASY, 0, 0,
-                effect, magnitudePerRank * rank, targetStat);
+                effect, magnitudePerRank * rank, targetStat, null, 0, 0, 0);
         }
     }
 

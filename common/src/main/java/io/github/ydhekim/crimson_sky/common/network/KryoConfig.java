@@ -136,5 +136,10 @@ public class KryoConfig {
         kryo.register(BuyScrollResponse.class, new RecordSerializer<>(BuyScrollResponse.class));
         kryo.register(BuyResetTokenRequest.class, new RecordSerializer<>(BuyResetTokenRequest.class));
         kryo.register(BuyResetTokenResponse.class, new RecordSerializer<>(BuyResetTokenResponse.class));
+
+        // Potions (O2 / system design §18) — the enum Skill's new CONSUMABLE fields name. Appended last so
+        // every positional ID above is untouched (system design §5, append-only); SkillType and ActionSource
+        // each gained a trailing constant, which is append-only within the enum for the same reason.
+        kryo.register(ResourceType.class);
     }
 }
