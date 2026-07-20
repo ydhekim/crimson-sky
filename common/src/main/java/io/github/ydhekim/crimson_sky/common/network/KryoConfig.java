@@ -158,5 +158,10 @@ public class KryoConfig {
         // here, not beside AttackResponse, precisely because registration is positional: order must match on
         // both sides, so a conceptually-related packet still goes at the physical end.
         kryo.register(AttackRejectedResponse.class, new RecordSerializer<>(AttackRejectedResponse.class));
+
+        // Ranked ladder (Epic R / system design §21) — the enum AttackRequest's new `mode` field carries.
+        // Appended after AttackRejectedResponse so every positional ID above is untouched (system design
+        // §5, append-only).
+        kryo.register(BattleMode.class);
     }
 }

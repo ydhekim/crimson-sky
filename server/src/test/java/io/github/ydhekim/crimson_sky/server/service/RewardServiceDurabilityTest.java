@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
@@ -53,7 +54,7 @@ class RewardServiceDurabilityTest {
     }
 
     private static AttackResult resultWithTurns(Array<Array<ResolvedAction>> turns) {
-        return new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, turns);
+        return new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, turns, BattleMode.NORMAL);
     }
 
     @Test
@@ -112,9 +113,10 @@ class RewardServiceDurabilityTest {
         CharacterService characterService = new CharacterService(dao);
         AttackService attackService = new AttackService(
             characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
-        RewardService rewardService = new RewardService(db.jdbi(), characterService);
+        RewardService rewardService = new RewardService(db.jdbi(), characterService,
+            db.jdbi().onDemand(BattleHistoryDao.class));
 
-        Optional<AttackResult> result = attackService.attack(ATTACKER);
+        Optional<AttackResult> result = attackService.attack(ATTACKER, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         assertEquals(Set.of(1L), RewardService.firedWeaponIds(result.get()),
             "precondition: the attacker's weapon really did fire this battle");

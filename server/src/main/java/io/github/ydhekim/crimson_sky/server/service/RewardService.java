@@ -3,6 +3,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
@@ -104,16 +105,24 @@ public class RewardService {
 
     private final Jdbi jdbi;
     private final CharacterService characterService;
+
+    /**
+     * Read-only, pre-transaction ranked-Elo lookups (system design §21) — the whole {@link RewardOutcome},
+     * including the gold/exp the Elo gap feeds, must be decided before any write starts, same as the
+     * normal-track Elo read. The transactional history insert still goes through a handle-attached DAO.
+     */
+    private final BattleHistoryDao battleHistoryDao;
     private final Random random;
 
-    public RewardService(Jdbi jdbi, CharacterService characterService) {
-        this(jdbi, characterService, new Random());
+    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao) {
+        this(jdbi, characterService, battleHistoryDao, new Random());
     }
 
     /** Test seam: a seeded/stubbed {@link Random} makes the every-10 milestone roll reproducible. */
-    public RewardService(Jdbi jdbi, CharacterService characterService, Random random) {
+    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao, Random random) {
         this.jdbi = jdbi;
         this.characterService = characterService;
+        this.battleHistoryDao = battleHistoryDao;
         this.random = random;
     }
 
@@ -134,21 +143,31 @@ public class RewardService {
             return RewardOutcome.none();
         }
 
-        ServiceResult<Integer> attackerElo = characterService.getElo(result.characterId());
-        if (!attackerElo.success()) {
-            log.error("No reward applied for battle " + result.battleId() + ": Elo lookup failed for character "
-                + result.characterId() + ".");
-            return RewardOutcome.none();
+        // Which Elo track this battle read from and moves (system design §21). The ranked lookup is a
+        // COALESCEd SQL aggregate that always yields a number, so unlike the normal-track read it has no
+        // "character not found" failure branch to guard.
+        BattleMode mode = result.mode();
+        int attackerElo;
+        if (mode == BattleMode.RANKED) {
+            attackerElo = battleHistoryDao.getRankedElo(result.characterId());
+        } else {
+            ServiceResult<Integer> normalElo = characterService.getElo(result.characterId());
+            if (!normalElo.success()) {
+                log.error("No reward applied for battle " + result.battleId() + ": Elo lookup failed for character "
+                    + result.characterId() + ".");
+                return RewardOutcome.none();
+            }
+            attackerElo = normalElo.data();
         }
 
-        Integer opponentElo = opponentElo(result, attackerElo.data());
+        Integer opponentElo = opponentElo(result, attackerElo, mode);
         if (opponentElo == null) {
             log.error("No reward applied for battle " + result.battleId() + ": Elo lookup failed for opponent "
                 + result.opponentCharacterId() + " of character " + result.characterId() + ".");
             return RewardOutcome.none();
         }
 
-        RewardOutcome base = computeRewards(result.won(), attackerElo.data(), opponentElo);
+        RewardOutcome base = computeRewards(result.won(), attackerElo, opponentElo);
         long accountId = attacker.data().accountId();
 
         // Leveling (L1): loop from the character's current level over the new cumulative experience,
@@ -180,13 +199,18 @@ public class RewardService {
         try {
             jdbi.useTransaction(handle -> {
                 CharacterDao characterDao = handle.attach(CharacterDao.class);
-                characterDao.applyBattleProgress(result.characterId(), outcome.expDelta(), outcome.eloDelta(),
+                // Only a NORMAL battle moves `characters.elo`; a RANKED battle's delta lives solely in
+                // its `battle_history.ranked_elo_delta`, summed live rather than mirrored into a column
+                // that could drift (system design §21).
+                int normalEloDelta = mode == BattleMode.NORMAL ? outcome.eloDelta() : 0;
+                characterDao.applyBattleProgress(result.characterId(), outcome.expDelta(), normalEloDelta,
                     newLevel, outcome.statPointsGained(), outcome.skillPointsGained());
                 handle.attach(AccountDao.class)
                     .addGlobalCurrency(accountId, outcome.goldDelta());
                 handle.attach(BattleHistoryDao.class).insert(
                     result.characterId(), result.opponentCharacterId(), result.opponentIsBot(),
-                    result.won(), outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta());
+                    result.won(), outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta(),
+                    mode.name(), mode == BattleMode.RANKED ? outcome.eloDelta() : null);
 
                 // Only touch the inventory column when something actually changed it — a read-modify-write
                 // under the row lock, in the same transaction, so an item grant or a durability decrement
@@ -402,11 +426,17 @@ public class RewardService {
      * paper, so it pays the flat base with no Elo-gap bonus and moves the rating by the full ±K/2 on a
      * surprise. No separate bot-Elo tracking exists or is needed.
      *
+     * <p>A real opponent's rating comes off whichever track matches {@code mode} (system design §21) —
+     * the bot rule above is mode-independent, since the attacker's own rating is already track-correct.
+     *
      * @return the opponent's rating, or {@code null} when a real opponent's rating can't be read
      */
-    private Integer opponentElo(AttackResult result, int attackerElo) {
+    private Integer opponentElo(AttackResult result, int attackerElo, BattleMode mode) {
         if (result.opponentIsBot()) {
             return attackerElo;
+        }
+        if (mode == BattleMode.RANKED) {
+            return battleHistoryDao.getRankedElo(result.opponentCharacterId());
         }
         ServiceResult<Integer> elo = characterService.getElo(result.opponentCharacterId());
         return elo.success() ? elo.data() : null;

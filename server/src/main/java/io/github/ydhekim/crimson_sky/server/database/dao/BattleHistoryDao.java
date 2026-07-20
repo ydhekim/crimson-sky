@@ -18,15 +18,32 @@ import java.time.Instant;
  */
 public interface BattleHistoryDao {
 
-    @SqlUpdate("INSERT INTO battle_history (character_id, opponent_character_id, opponent_is_bot, won, gold_delta, experience_delta, elo_delta) " +
-        "VALUES (:characterId, :opponentCharacterId, :opponentIsBot, :won, :goldDelta, :expDelta, :eloDelta)")
+    @SqlUpdate("INSERT INTO battle_history (character_id, opponent_character_id, opponent_is_bot, won, gold_delta, experience_delta, elo_delta, battle_mode, ranked_elo_delta) " +
+        "VALUES (:characterId, :opponentCharacterId, :opponentIsBot, :won, :goldDelta, :expDelta, :eloDelta, :battleMode, :rankedEloDelta)")
     void insert(@Bind("characterId") long characterId,
                 @Bind("opponentCharacterId") Long opponentCharacterId,
                 @Bind("opponentIsBot") boolean opponentIsBot,
                 @Bind("won") boolean won,
                 @Bind("goldDelta") int goldDelta,
                 @Bind("expDelta") long expDelta,
-                @Bind("eloDelta") int eloDelta);
+                @Bind("eloDelta") int eloDelta,
+                @Bind("battleMode") String battleMode,
+                @Bind("rankedEloDelta") Integer rankedEloDelta);
+
+    /**
+     * Live ranked Elo as of {@code asOf} (system design §21) — never a stored column, always
+     * {@code 1000 + the sum of ranked-only deltas up to that instant}. The {@code asOf} bound is what lets
+     * a future ladder query ask "what was this character's standing at the end of last month" with the
+     * identical formula used for "what is it right now".
+     */
+    @SqlQuery("SELECT 1000 + COALESCE(SUM(ranked_elo_delta), 0) FROM battle_history " +
+        "WHERE character_id = :characterId AND battle_mode = 'RANKED' AND created_at <= :asOf")
+    int getRankedEloAsOf(@Bind("characterId") long characterId, @Bind("asOf") Instant asOf);
+
+    /** Live ranked Elo right now — the form {@code AttackService}'s matchmaking actually needs. */
+    default int getRankedElo(long characterId) {
+        return getRankedEloAsOf(characterId, Instant.now());
+    }
 
     /**
      * How many battles {@code characterId} has won since {@code since} (system design §19). The live

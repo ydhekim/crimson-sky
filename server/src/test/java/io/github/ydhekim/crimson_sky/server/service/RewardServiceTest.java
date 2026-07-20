@@ -1,8 +1,10 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
@@ -10,6 +12,8 @@ import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
 import io.github.ydhekim.crimson_sky.server.support.TestDatabase;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,7 +53,8 @@ class RewardServiceTest {
         HeadlessGdx.install();
         db = TestDatabase.create().withAccount(ACCOUNT_A, STARTING_GOLD).withAccount(ACCOUNT_B, 0L);
         characterDao = new FakeCharacterDao();
-        rewardService = new RewardService(db.jdbi(), new CharacterService(characterDao));
+        rewardService = new RewardService(db.jdbi(), new CharacterService(characterDao),
+            db.jdbi().onDemand(BattleHistoryDao.class));
     }
 
     /** Registers a character in both views: the DAO the service reads from, and the DB it writes to. */
@@ -60,12 +65,19 @@ class RewardServiceTest {
 
     /** A finished battle against a real, persisted opponent. */
     private AttackResult realFight(boolean won) {
-        return new AttackResult(77L, ATTACKER, OPPONENT, "Boran", false, won, new Array<Array<ResolvedAction>>());
+        return realFight(won, BattleMode.NORMAL);
+    }
+
+    /** As {@link #realFight(boolean)}, on a chosen Elo track (system design §21). */
+    private AttackResult realFight(boolean won, BattleMode mode) {
+        return new AttackResult(77L, ATTACKER, OPPONENT, "Boran", false, won,
+            new Array<Array<ResolvedAction>>(), mode);
     }
 
     /** A finished battle against a synthesized bot — no row in `characters`, so no opponent id. */
     private AttackResult botFight(boolean won) {
-        return new AttackResult(78L, ATTACKER, null, "Wanderer", true, won, new Array<Array<ResolvedAction>>());
+        return new AttackResult(78L, ATTACKER, null, "Wanderer", true, won,
+            new Array<Array<ResolvedAction>>(), BattleMode.NORMAL);
     }
 
     @Test
@@ -209,6 +221,80 @@ class RewardServiceTest {
         assertEquals(STARTING_EXP, db.experienceOf(OPPONENT));
         assertEquals(1000, db.eloOf(OPPONENT));
         assertEquals(1, db.battleHistoryRowCount(), "one row, for the attacker's side only");
+    }
+
+    @Test
+    void aRankedWinMovesTheRankedTrackAndLeavesStoredEloUntouched() {
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+
+        RewardOutcome outcome = rewardService.applyRewards(realFight(true, BattleMode.RANKED));
+
+        // Both sides sit at the 1000 ranked baseline (no ranked history), so the identical K-32 formula
+        // pays the identical 16 — only which track it lands on differs (§21). Gold/Exp/skill points are
+        // byte-for-byte the normal-mode payout.
+        assertEquals(new RewardOutcome(25, 50L, 16, 3, 1, 3, null), outcome);
+        assertEquals(1000, db.eloOf(ATTACKER), "a ranked battle never writes `characters.elo`");
+        TestDatabase.BattleHistoryRow row = db.onlyBattleHistoryRow();
+        assertEquals("RANKED", row.battleMode());
+        assertEquals(16, row.rankedEloDelta().intValue(), "the swing lives solely in ranked_elo_delta");
+        assertEquals(16, row.eloDelta(), "elo_delta still records what the formula produced");
+    }
+
+    @Test
+    void aRankedLossCostsRankedRatingButNotStoredElo() {
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+
+        RewardOutcome outcome = rewardService.applyRewards(realFight(false, BattleMode.RANKED));
+
+        assertEquals(-16, outcome.eloDelta());
+        assertEquals(1000, db.eloOf(ATTACKER), "the stored column is untouched by a ranked loss too");
+        assertEquals(-16, db.onlyBattleHistoryRow().rankedEloDelta().intValue());
+    }
+
+    @Test
+    void rankedRewardsAreComputedAgainstTheRankedTrackNotTheStoredColumn() {
+        // Stored Elos are wildly apart (1400 vs 600); the ranked track has no history, so both sides sit
+        // at the 1000 baseline. A ranked win must pay the even-fight 16/25/50 — any bleed-through from
+        // the stored column would surface as a gap bonus or a shrunken delta.
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1400);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 600);
+
+        RewardOutcome outcome = rewardService.applyRewards(realFight(true, BattleMode.RANKED));
+
+        assertEquals(new RewardOutcome(25, 50L, 16, 3, 1, 3, null), outcome);
+        assertEquals(1400, db.eloOf(ATTACKER));
+    }
+
+    @Test
+    void rankedEloGapBonusesReadTheLiveRankedSum() {
+        // The opponent's ranked Elo is 1000 + a seeded +200 delta — the same "compute live off
+        // battle_history" rule quests already use (§19/§21). Beating them pays exactly what beating a
+        // 1200-rated opponent pays on the normal track: 24 Elo, gap-boosted gold/exp, two level-ups.
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+        db.withRankedBattleHistory(OPPONENT, 200, Instant.now());
+
+        RewardOutcome outcome = rewardService.applyRewards(realFight(true, BattleMode.RANKED));
+
+        assertEquals(new RewardOutcome(45, 90L, 24, 3, 2, 6, null), outcome);
+        assertEquals(1000, db.eloOf(ATTACKER), "even a gap-boosted ranked win leaves `characters.elo` alone");
+    }
+
+    @Test
+    void aNormalBattleStillMovesStoredEloAndRecordsANullRankedDelta() {
+        // The regression half of §21's "additive, not a retrofit": the pre-ranked write path is unchanged,
+        // and its history row says so explicitly.
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+
+        rewardService.applyRewards(realFight(true));
+
+        assertEquals(1016, db.eloOf(ATTACKER));
+        TestDatabase.BattleHistoryRow row = db.onlyBattleHistoryRow();
+        assertEquals("NORMAL", row.battleMode());
+        assertNull(row.rankedEloDelta(), "a NORMAL row carries no ranked delta at all");
     }
 
     @Test

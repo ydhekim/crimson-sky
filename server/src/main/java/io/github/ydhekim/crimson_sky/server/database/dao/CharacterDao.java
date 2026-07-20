@@ -48,6 +48,27 @@ public interface CharacterDao {
     @SqlQuery("SELECT * FROM characters WHERE id <> :characterId")
     List<CharacterEntity> findAllOpponentCandidates(@Bind("characterId") long characterId);
 
+    /**
+     * Ranked opponent candidates within ±eloRange of a live-computed ranked Elo, restricted to level-25+
+     * characters (system design §21). Ranked Elo isn't a stored column, so the correlated subquery computes
+     * it inline per candidate — the same "compute live" rule §19/§20 already established, just inlined into
+     * a WHERE clause instead of read separately.
+     */
+    @SqlQuery("SELECT c.* FROM characters c WHERE c.id <> :characterId AND c.level >= 25 " +
+        "AND (1000 + COALESCE((SELECT SUM(bh.ranked_elo_delta) FROM battle_history bh " +
+        "WHERE bh.character_id = c.id AND bh.battle_mode = 'RANKED'), 0)) BETWEEN :minElo AND :maxElo")
+    List<CharacterEntity> findRankedOpponentCandidatesInEloRange(@Bind("characterId") long characterId,
+                                                                 @Bind("minElo") int minElo,
+                                                                 @Bind("maxElo") int maxElo);
+
+    /**
+     * The unbounded ranked widening step (system design §21) — every level-25+ opponent but the requester,
+     * regardless of Elo. No live-elo computation needed here, unlike the banded query above: the widen step
+     * never filtered by Elo even in the normal-mode version ({@link #findAllOpponentCandidates}).
+     */
+    @SqlQuery("SELECT * FROM characters WHERE id <> :characterId AND level >= 25")
+    List<CharacterEntity> findAllRankedOpponentCandidates(@Bind("characterId") long characterId);
+
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE name = :name)")
     boolean isNameTaken(@Bind("name") String name);
 

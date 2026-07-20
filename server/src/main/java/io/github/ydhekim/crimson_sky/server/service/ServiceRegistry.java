@@ -29,7 +29,7 @@ public class ServiceRegistry {
         // The odd one out: it takes the Jdbi itself, not an onDemand DAO. A reward spans `characters`,
         // `accounts` and `battle_history`, and onDemand proxies open a connection per call — so the only
         // way to get one transaction across all three is to attach the DAOs to a handle it owns.
-        this.rewardService = new RewardService(dbManager.getJdbi(), characterService);
+        this.rewardService = new RewardService(dbManager.getJdbi(), characterService, battleHistoryDao);
 
         // Same reason as RewardService: a learn/upgrade spans `characters` (skill points, skill tree,
         // inventory) and `accounts` (gold) atomically, so it needs the raw Jdbi, not onDemand proxies.

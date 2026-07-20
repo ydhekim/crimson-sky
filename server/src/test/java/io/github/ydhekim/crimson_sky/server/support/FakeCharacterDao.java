@@ -57,6 +57,23 @@ public class FakeCharacterDao implements CharacterDao {
         return candidates(characterId, row -> true);
     }
 
+    /**
+     * The fake cannot compute ranked Elo — that lives in {@code battle_history}, a different DAO's table —
+     * so this approximates by ignoring the Elo band and returning every level-25+ candidate. Real elo-band
+     * filtering is verified against actual SQL in {@code CharacterDaoRankedOpponentCandidatesTest}, not
+     * through this fake. Tests that only care about the level-25 gate (not band-narrowing) can still use
+     * this safely.
+     */
+    @Override
+    public List<CharacterEntity> findRankedOpponentCandidatesInEloRange(long characterId, int minElo, int maxElo) {
+        return candidates(characterId, row -> row.character().level() >= 25);
+    }
+
+    @Override
+    public List<CharacterEntity> findAllRankedOpponentCandidates(long characterId) {
+        return candidates(characterId, row -> row.character().level() >= 25);
+    }
+
     private List<CharacterEntity> candidates(long characterId, java.util.function.Predicate<Row> filter) {
         List<CharacterEntity> result = new ArrayList<>();
         for (Row row : rows.values()) {

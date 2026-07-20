@@ -1,6 +1,8 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
+import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
@@ -50,11 +52,19 @@ class AttackServiceTest {
 
     /** A service with a seeded RNG so "pick randomly among candidates" is reproducible. */
     private AttackService service() {
-        return new AttackService(new CharacterService(characterDao), new BotFactory(new Random(42L)), battleHistoryDao, new Random(42L));
+        return service(new BotFactory(new Random(42L)));
+    }
+
+    private AttackService service(BotFactory botFactory) {
+        return new AttackService(new CharacterService(characterDao), botFactory, battleHistoryDao, new Random(42L));
     }
 
     private AttackResult attack() {
-        Optional<AttackResult> result = service().attack(ATTACKER);
+        return attack(BattleMode.NORMAL);
+    }
+
+    private AttackResult attack(BattleMode mode) {
+        Optional<AttackResult> result = service().attack(ATTACKER, mode);
         assertTrue(result.isPresent(), "an owned, loadable character always resolves a battle");
         return result.get();
     }
@@ -140,7 +150,7 @@ class AttackServiceTest {
 
     @Test
     void refusesToAttackWithACharacterThatCannotBeLoaded() {
-        assertTrue(service().attack(999L).isEmpty(), "an unknown character resolves no battle");
+        assertTrue(service().attack(999L, BattleMode.NORMAL).isEmpty(), "an unknown character resolves no battle");
     }
 
     @Test
@@ -166,6 +176,80 @@ class AttackServiceTest {
         }
         assertEquals(5, service().remainingDailyBattles(ATTACKER),
             "battles before this UTC day's midnight are outside the daily window");
+    }
+
+    @Test
+    void rankedEligibilityIsGatedAtLevel25() {
+        characterDao.with(CombatFixtures.characterAtLevel(2L, 20L, "Boran", 24, 0L), 20L, 1000);
+        characterDao.with(CombatFixtures.characterAtLevel(3L, 30L, "Cem", 25, 0L), 30L, 1000);
+
+        AttackService service = service();
+        assertFalse(service.isRankedEligible(ATTACKER), "the level-1 fixture is below the gate (§21)");
+        assertFalse(service.isRankedEligible(2L), "level 24 is still below the gate");
+        assertTrue(service.isRankedEligible(3L), "level 25 is exactly eligible");
+        assertFalse(service.isRankedEligible(999L), "an unloadable character is never eligible");
+    }
+
+    @Test
+    void rankedMatchmakingExcludesSub25CandidatesAndFallsBackToABot() {
+        // A level-1 candidate a NORMAL attack would happily match against (same Elo, real row) — ranked
+        // must never see it, leaving only the bot fallback.
+        characterDao.with(CombatFixtures.character(2L, 20L, "Boran"), 20L, 1000);
+        characterDao.with(CombatFixtures.characterAtLevel(ATTACKER, ACCOUNT_A, "Ayla", 25, 0L), ACCOUNT_A, 1000);
+
+        AttackResult result = attack(BattleMode.RANKED);
+
+        assertTrue(result.opponentIsBot(), "the sub-25 candidate is invisible to ranked matchmaking (§21)");
+        assertNull(result.opponentCharacterId());
+        assertEquals(BattleMode.RANKED, result.mode(), "the result records which track this battle fought on");
+    }
+
+    @Test
+    void rankedMatchmakingStillFindsALevel25PlusOpponent() {
+        characterDao.with(CombatFixtures.characterAtLevel(ATTACKER, ACCOUNT_A, "Ayla", 25, 0L), ACCOUNT_A, 1000);
+        characterDao.with(CombatFixtures.characterAtLevel(2L, 20L, "Boran", 30, 0L), 20L, 1000);
+
+        AttackResult result = attack(BattleMode.RANKED);
+
+        assertFalse(result.opponentIsBot(), "a level-25+ candidate is a real ranked opponent");
+        assertEquals(2L, result.opponentCharacterId().longValue());
+    }
+
+    @Test
+    void aRankedAttackKeysOffTheLiveRankedEloNotTheStoredColumn() {
+        // The stored `characters.elo` fixture value is 1000; the ranked track diverges to 1120 via a
+        // seeded past RANKED battle. With no eligible candidates the bot fallback receives whichever
+        // number matchmaking keyed off — the one observable that distinguishes the two tracks headlessly.
+        characterDao.with(CombatFixtures.characterAtLevel(ATTACKER, ACCOUNT_A, "Ayla", 25, 0L), ACCOUNT_A, 1000);
+        battleHistoryDao.withRanked(ATTACKER, 120, Instant.now());
+        RecordingBotFactory botFactory = new RecordingBotFactory();
+
+        assertTrue(service(botFactory).attack(ATTACKER, BattleMode.RANKED).isPresent());
+        assertEquals(1120, botFactory.lastElo, "ranked matchmaking reads 1000 + SUM(ranked_elo_delta) (§21)");
+
+        assertTrue(service(botFactory).attack(ATTACKER, BattleMode.NORMAL).isPresent());
+        assertEquals(1000, botFactory.lastElo, "a NORMAL attack still reads the stored `characters.elo`");
+    }
+
+    @Test
+    void aNormalAttackRecordsTheNormalModeOnItsResult() {
+        assertEquals(BattleMode.NORMAL, attack().mode(),
+            "regression: the pre-§21 attack path is byte-for-byte a NORMAL battle");
+    }
+
+    /** Captures the Elo handed to the bot fallback — the seam that reveals which track matchmaking read. */
+    private static final class RecordingBotFactory extends BotFactory {
+        int lastElo = -1;
+
+        RecordingBotFactory() {
+            super(new Random(42L));
+        }
+
+        @Override
+        public Character createBot(int elo) {
+            lastElo = elo;
+            return super.createBot(elo);
+        }
     }
 
     @Test

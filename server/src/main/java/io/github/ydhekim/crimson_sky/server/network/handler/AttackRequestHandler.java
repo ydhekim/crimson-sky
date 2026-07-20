@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRejectedResponse;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
@@ -64,7 +65,14 @@ public class AttackRequestHandler implements RequestHandler<AttackRequest> {
             return;
         }
 
-        Optional<AttackResult> result = attackService.attack(request.characterId());
+        if (request.mode() == BattleMode.RANKED && !attackService.isRankedEligible(request.characterId())) {
+            log.info("Rejected ranked attack request: character " + request.characterId()
+                + " is below the level-25 gate (Connection ID: " + connection.getID() + ")");
+            connection.sendTCP(new AttackRejectedResponse(MessageCode.RANKED_LEVEL_GATE_NOT_MET.name()));
+            return;
+        }
+
+        Optional<AttackResult> result = attackService.attack(request.characterId(), request.mode());
         if (result.isEmpty()) {
             log.info("Dropped attack request for character " + request.characterId()
                 + " (Connection ID: " + connection.getID() + ")");

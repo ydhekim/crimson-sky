@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.combat;
 
 import com.badlogic.gdx.utils.Array;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 
@@ -17,6 +18,10 @@ import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
  * design §7): {@link #toResponse(RewardOutcome)} is the only place this object narrows to a packet, and
  * it drops both fields deliberately. {@code opponentCharacterId} is {@code null} exactly when the
  * opponent was a bot, mirroring {@code battle_history.opponent_character_id}'s nullability (§8).
+ *
+ * <p>{@code mode} (system design §21) decides which Elo track the reward moves; it does not cross the
+ * wire — the client already knows which mode it requested, and the response's {@code eloDelta} is
+ * "whichever track this battle moved".
  */
 public record AttackResult(
     long battleId,
@@ -25,7 +30,8 @@ public record AttackResult(
     String opponentDisplayName,
     boolean opponentIsBot,
     boolean won,
-    Array<Array<ResolvedAction>> turns
+    Array<Array<ResolvedAction>> turns,
+    BattleMode mode
 ) {
 
     /**
