@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.support;
 
 import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
+import io.github.ydhekim.crimson_sky.server.database.entity.RecentMatchRow;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -60,6 +61,22 @@ public class FakeBattleHistoryDao implements BattleHistoryDao {
         return (int) rows.stream()
             .filter(r -> r.characterId() == characterId && r.won())
             .count();
+    }
+
+    @Override
+    public int countTotalBattles(long characterId) {
+        return (int) rows.stream()
+            .filter(r -> r.characterId() == characterId)
+            .count();
+    }
+
+    /**
+     * Match-history projection carries opponent name / gold-elo detail this fake's {@link Row} never tracks,
+     * so it's proven against real SQL in {@code CharacterPageServiceTest}, not modelled here.
+     */
+    @Override
+    public List<RecentMatchRow> findRecentMatches(long characterId, int limit) {
+        throw new UnsupportedOperationException("match history is verified against real SQL, not this fake");
     }
 
     @Override

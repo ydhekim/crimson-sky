@@ -557,9 +557,9 @@ CREATE TABLE IF NOT EXISTS ladder_claims (
 ```
 Same `UNIQUE`-at-the-database-level taste already used for `quest_claims` and `account_identities.user_id`.
 
-## 22. Achievements & character statistics — redesigned 2026-07-15
+## 22. Achievements & character statistics — redesigned 2026-07-15, S1-S2 shipped 2026-07-21
 
-Eighth slice of the a–k expansion, and a genuine redesign rather than a patch. Grounding first: `achievement_definitions`/`account_achievements` already exist — 9 seeded achievements, a read endpoint, a client screen — but nothing anywhere in the codebase ever writes to `account_achievements`. Every achievement is permanently locked for every account today; the tables were scaffolded (likely for early UI testing) but unlock-detection was never built. This section replaces that scaffold rather than extending it.
+Eighth slice of the a–k expansion, and a genuine redesign rather than a patch. Grounding first: `achievement_definitions`/`account_achievements` already exist — 10 seeded achievements (this section originally said 9; corrected 2026-07-21 against the actual V4 seed migration) — but nothing anywhere in the codebase ever wrote to `account_achievements`. Every achievement was permanently locked for every account; the tables were scaffolded (likely for early UI testing) but unlock-detection was never built. **S1-S2 (content model + automatic unlock) shipped 2026-07-21** — see `docs/planning/18-implementation-prompt-s1-s2-achievements.md`. **S3-S4 (character page + title equip) are specced in `docs/planning/19-implementation-prompt-s3-s4-character-page.md`.**
 
 **Scope is per-achievement, not a single global choice.** `achievement_definitions` gains `scope` (`ACCOUNT` or `CHARACTER`). Some seeded achievements are inescapably account-level facts (Day One Survivor, Pioneer — about *when the account was created*, not anything a character did); others are inescapably character-level combat feats (Perfect Storm, First Blood — read directly off `battle_history`, which is keyed by `character_id`). Forcing one scope onto both would be wrong for half the existing content.
 
@@ -592,9 +592,9 @@ Unlock write is `INSERT ... ON CONFLICT DO NOTHING` against the relevant index, 
 
 **Character page is a new read-only aggregate, no new persistence of its own:** character info + §15's level/exp + the live battle statistics above + unlocked achievements/badges (filtered to the account, joined against this character where scope is `CHARACTER`) + Achievement Score + equipped title. Exact packet shape deferred to implementation-prompt time, same as every other pending packet detail in this expansion.
 
-**Migration V14:**
+**Migration, as actually shipped (split across two passes):** S1-S2 landed `V15__Redesign_Achievements_And_Character_Statistics.sql` — everything below except the last line, including `battle_history.turn_count` (moved up from originally being grouped with S3/S4 content, since S2's own `FASTEST_WIN_TURNS` criterion needs it). The dropped-constraint name was confirmed, not guessed: Postgres's deterministic auto-naming gives `V1__Initial_Schema.sql`'s inline `UNIQUE (account_id, achievement_id)` the name `account_achievements_account_id_achievement_id_key`, and that's what the shipped migration drops. `characters.equipped_title` is deferred to S3-S4's own `V16__Add_Equipped_Title.sql` (`docs/planning/19-implementation-prompt-s3-s4-character-page.md`), since it's S4-only and nothing in S1-S2 needs it.
 ```sql
--- V14__Redesign_Achievements_And_Character_Statistics.sql
+-- V15__Redesign_Achievements_And_Character_Statistics.sql (S1-S2, shipped)
 ALTER TABLE battle_history ADD COLUMN turn_count INTEGER NOT NULL DEFAULT 0;
 
 ALTER TABLE achievement_definitions ADD COLUMN scope VARCHAR(16) NOT NULL DEFAULT 'ACCOUNT';
@@ -615,10 +615,12 @@ ALTER TABLE achievement_unlocks ADD COLUMN character_id INTEGER REFERENCES chara
 ALTER TABLE achievement_unlocks DROP CONSTRAINT account_achievements_account_id_achievement_id_key;
 CREATE UNIQUE INDEX achv_unlock_account_uq ON achievement_unlocks (account_id, achievement_id) WHERE character_id IS NULL;
 CREATE UNIQUE INDEX achv_unlock_character_uq ON achievement_unlocks (account_id, achievement_id, character_id) WHERE character_id IS NOT NULL;
-
+```
+```sql
+-- V16__Add_Equipped_Title.sql (S3-S4)
 ALTER TABLE characters ADD COLUMN equipped_title VARCHAR(50);
 ```
-The dropped-constraint name is a placeholder — the actual auto-generated name from `V1__Initial_Schema.sql`'s `UNIQUE (account_id, achievement_id)` needs confirming against the live schema at implementation time. Re-seeding the 9 existing achievements with real `scope`/`criteria_type`/`criteria_params`/`points` values is content work for that same pass, not re-derived here.
+Re-seeding the (actually 10) existing achievements with real `scope`/`criteria_type`/`criteria_params`/`points` values was content work done as part of S1's migration — see the prompt for the specific mapping chosen and its fit caveats.
 
 ## 23. Character customization — decided 2026-07-15
 

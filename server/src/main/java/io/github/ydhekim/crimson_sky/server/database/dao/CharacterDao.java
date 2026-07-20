@@ -221,6 +221,14 @@ public interface CharacterDao {
     @SqlUpdate("UPDATE characters SET experience = experience + :xpDelta WHERE id = :characterId")
     void addExperience(@Bind("characterId") long characterId, @Bind("xpDelta") long xpDelta);
 
+    /** The currently equipped title id for a character (system design §22/S4), or empty if none is set. */
+    @SqlQuery("SELECT equipped_title FROM characters WHERE id = :characterId")
+    Optional<String> getEquippedTitle(@Bind("characterId") long characterId);
+
+    /** Writes the equipped title id ({@code null} clears it) — the single-column write behind S4's equip. */
+    @SqlUpdate("UPDATE characters SET equipped_title = :titleId WHERE id = :characterId")
+    void setEquippedTitle(@Bind("characterId") long characterId, @Bind("titleId") String titleId);
+
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);
 

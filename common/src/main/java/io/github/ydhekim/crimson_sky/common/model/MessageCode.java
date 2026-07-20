@@ -45,5 +45,8 @@ public enum MessageCode {
     // Ranked ladder claim (system design §21)
     LADDER_NOT_RANKED_ELIGIBLE,
     LADDER_NO_REWARD_THIS_RANK,
-    LADDER_ALREADY_CLAIMED
+    LADDER_ALREADY_CLAIMED,
+
+    // Character page / title equip (system design §22)
+    TITLE_NOT_UNLOCKED
 }
