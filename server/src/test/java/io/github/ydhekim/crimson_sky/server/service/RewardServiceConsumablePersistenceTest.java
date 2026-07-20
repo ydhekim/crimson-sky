@@ -74,7 +74,7 @@ class RewardServiceConsumablePersistenceTest {
             .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
             .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
         rewardService = new RewardService(db.jdbi(), new CharacterService(dao),
-            db.jdbi().onDemand(BattleHistoryDao.class));
+            db.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService());
     }
 
     private static ResolvedAction potionSip() {

@@ -7,6 +7,5 @@ public record AccountAchievement(
     int xpReward,
     String iconId,
     boolean isUnlocked,
-    String unlockedAt,
-    String progressData) {
+    String unlockedAt) {
 }

@@ -92,7 +92,8 @@ class BattleLeavesInventoryAloneTest {
 
         CharacterService characterService = new CharacterService(characterDao);
         attackService = new AttackService(characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
-        rewardService = new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class));
+        rewardService = new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class),
+            new AchievementUnlockService());
     }
 
     @Test
@@ -163,7 +164,7 @@ class BattleLeavesInventoryAloneTest {
         AttackService shopAttack = new AttackService(
             characterService, new BotFactory(new Random(42L)), shopDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService shopReward = new RewardService(shopDb.jdbi(), characterService,
-            shopDb.jdbi().onDemand(BattleHistoryDao.class));
+            shopDb.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService());
         ShopService shopService = new ShopService(shopDb.jdbi(), characterService);
 
         Optional<AttackResult> result = shopAttack.attack(ATTACKER, BattleMode.NORMAL);
@@ -204,7 +205,7 @@ class BattleLeavesInventoryAloneTest {
             .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
             .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
         RewardService potionReward = new RewardService(potionDb.jdbi(), new CharacterService(dao),
-            potionDb.jdbi().onDemand(BattleHistoryDao.class));
+            potionDb.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService());
 
         potionReward.applyRewards(new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true,
             Array.with(Array.with(
@@ -302,7 +303,7 @@ class BattleLeavesInventoryAloneTest {
         CharacterService characterService = new CharacterService(dao);
         AttackService bonusAttack = new AttackService(characterService, new BotFactory(new Random(42L)), bonusDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService bonusReward = new RewardService(bonusDb.jdbi(), characterService,
-            bonusDb.jdbi().onDemand(BattleHistoryDao.class), alwaysRollsBonus());
+            bonusDb.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService(), alwaysRollsBonus());
 
         Optional<AttackResult> result = bonusAttack.attack(attacker, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");

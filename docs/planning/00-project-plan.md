@@ -1,6 +1,6 @@
 # Crimson Sky — Project Plan
 
-Last updated: 2026-07-17 (M3.5 progression/economy in progress — Epics L, M, N, O all done; O2 potions landed this pass)
+Last updated: 2026-07-21 (M3.5 progression/economy in progress — Epics L, M, N, O, P, Q, R all done; S1-S2 (declarative achievements + automatic unlock) done, S3/S4 and Epic T still todo)
 
 ## 1. Vision
 
