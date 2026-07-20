@@ -632,10 +632,12 @@ Ninth and final slice of the a–k expansion, and the smallest — purely cosmet
 
 **Set once at creation; no edit endpoint in v1.0.** A later "restyle" item is a natural extension of Epic O's shop, not built now.
 
-**Migration V15:**
+**Migration V17** (corrected 2026-07-21 while implementing T1 — V15/V16 went to S1-S2/S3-S4, both designed concurrently with this section):
 ```sql
--- V15__Add_Character_Appearance.sql
+-- V17__Add_Character_Appearance.sql
 ALTER TABLE characters ADD COLUMN appearance JSONB NOT NULL DEFAULT '{}'::jsonb;
 ```
 
-**New packets** (shape to be finalized at implementation-prompt time, same treatment as every other pending packet in this expansion): a quest-status request returning each of the three quests' live progress and claimed/unclaimed state for the current period, and a claim request (character id + quest id) that re-validates the criteria server-side — never trusts a client-reported "I completed this" — checks `quest_claims` for an existing row this period, applies the reward via the shared `updateInventory`/reward-application primitives, and inserts the claim row.
+**Appearance rides as a sibling field on `CreateCharacterRequest`, not as part of the shared `Character` model.** `Character` is constructed at 16 call sites across combat tests, `BotFactory`, and shop/loadout tests, none of which care about cosmetics — the same reasoning that kept §22's `equippedTitle` off `Character` too. `CreateCharacterRequest` gains `Appearance appearance` alongside its existing `character` field; the new `Appearance` record and its curated-list constants (`GENDERS`/`HAIR_TYPES`/`HAIR_COLORS`/`SKIN_COLORS`) are the single source of truth read by both the creation screen's selection buttons and server-side validation, so the two can't drift — see `docs/planning/20-implementation-prompt-t1-character-customization.md` for the concrete shape.
+
+*(This paragraph previously described a quest-status/claim packet pair — leftover copy-paste from §19 during an earlier drafting pass, corrected 2026-07-21; it never belonged in this section.)*

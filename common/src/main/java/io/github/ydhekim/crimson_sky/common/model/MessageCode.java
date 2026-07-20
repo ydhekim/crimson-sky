@@ -48,5 +48,8 @@ public enum MessageCode {
     LADDER_ALREADY_CLAIMED,
 
     // Character page / title equip (system design §22)
-    TITLE_NOT_UNLOCKED
+    TITLE_NOT_UNLOCKED,
+
+    // Character customization (system design §23)
+    CHAR_INVALID_APPEARANCE
 }

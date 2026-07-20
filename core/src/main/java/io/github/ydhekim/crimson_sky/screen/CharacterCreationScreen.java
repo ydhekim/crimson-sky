@@ -10,6 +10,7 @@ import com.badlogic.gdx.utils.ObjectMap;
 import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.*;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
+import io.github.ydhekim.crimson_sky.common.model.Appearance;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Faction;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
@@ -19,6 +20,7 @@ import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterReques
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 
 import java.util.HashMap;
+import java.util.List;
 
 public class CharacterCreationScreen extends BaseScreen {
 
@@ -38,6 +40,13 @@ public class CharacterCreationScreen extends BaseScreen {
 
     private int statPool = INITIAL_STAT_POOL;
     private Faction selectedFaction = Faction.A;
+
+    // Purely cosmetic (system design §23), defaulting to each curated list's first entry. The lists live in
+    // Appearance so the button UI here and the server's validation read one source of truth.
+    private String selectedGender = Appearance.GENDERS.get(0);
+    private String selectedHairType = Appearance.HAIR_TYPES.get(0);
+    private String selectedHairColor = Appearance.HAIR_COLORS.get(0);
+    private String selectedSkinColor = Appearance.SKIN_COLORS.get(0);
 
     public CharacterCreationScreen(CrimsonSky game) {
         super(game);
@@ -74,6 +83,7 @@ public class CharacterCreationScreen extends BaseScreen {
         VisTable middleTable = new VisTable();
 
         middleTable.add(createFactionSelectionTable()).expandX().fillX().padBottom(20).row();
+        middleTable.add(createAppearanceSelectionTable()).expandX().fillX().padBottom(20).row();
         middleTable.add(createStatsTable()).expand().fill();
 
         mainPanel.add(middleTable).expand().fill().padBottom(20).row();
@@ -115,6 +125,33 @@ public class CharacterCreationScreen extends BaseScreen {
         factionTable.add(new VisScrollPane(factionDescriptionLabel)).expandX().fillX().height(60).padTop(10);
 
         return factionTable;
+    }
+
+    /**
+     * The four purely-cosmetic choices (system design §23), built the same way {@link #createFactionSelectionTable}
+     * builds a row of toggle buttons per option — one row per category. No portrait/preview yet, since nothing
+     * renders this data (M4 is still placeholder-rendering; M5's art pipeline is what eventually reads it).
+     */
+    private VisTable createAppearanceSelectionTable() {
+        VisTable appearanceTable = new VisTable();
+        appearanceTable.add(createOptionRow("Gender", Appearance.GENDERS, selectedGender, v -> selectedGender = v)).expandX().fillX().row();
+        appearanceTable.add(createOptionRow("Hair Type", Appearance.HAIR_TYPES, selectedHairType, v -> selectedHairType = v)).expandX().fillX().row();
+        appearanceTable.add(createOptionRow("Hair Color", Appearance.HAIR_COLORS, selectedHairColor, v -> selectedHairColor = v)).expandX().fillX().row();
+        appearanceTable.add(createOptionRow("Skin Color", Appearance.SKIN_COLORS, selectedSkinColor, v -> selectedSkinColor = v)).expandX().fillX();
+        return appearanceTable;
+    }
+
+    private VisTable createOptionRow(String label, List<String> options, String initiallySelected, java.util.function.Consumer<String> onSelect) {
+        VisTable rowTable = new VisTable();
+        rowTable.add(new VisLabel(label + ": ")).width(100);
+        for (String option : options) {
+            new UIButtonBuilder(option)
+                .withStyle(customButtonStyle)
+                .withSize(90, 30)
+                .withAction(() -> onSelect.accept(option))
+                .buildAndAddTo(rowTable);
+        }
+        return rowTable;
     }
 
     private VisTable createStatsTable() {
@@ -233,7 +270,8 @@ public class CharacterCreationScreen extends BaseScreen {
             new HashMap<>()
         );
 
-        game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter));
+        Appearance appearance = new Appearance(selectedGender, selectedHairType, selectedHairColor, selectedSkinColor);
+        game.getNetworkClient().sendTCP(new CreateCharacterRequest(newCharacter, appearance));
         game.getScreenRouter().navigateTo(ScreenType.CHARACTERS);
     }
 

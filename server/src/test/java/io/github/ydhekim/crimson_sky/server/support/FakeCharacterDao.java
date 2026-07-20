@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.server.support;
 
+import io.github.ydhekim.crimson_sky.common.model.Appearance;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Loadout;
@@ -26,6 +27,10 @@ public class FakeCharacterDao implements CharacterDao {
 
     private final Map<Long, Row> rows = new LinkedHashMap<>();
     private boolean leakRequesterIntoCandidates;
+
+    // These are read-only matchmaking/ownership projections — appearance (system design §23) is never read
+    // on this path, so the fake fills the CharacterEntity's cosmetic field with an empty placeholder.
+    private static final Appearance NO_APPEARANCE = new Appearance(null, null, null, null);
 
     /** Registers {@code character} as owned by {@code accountId}, rated at {@code elo}, with no stat points. */
     public FakeCharacterDao with(Character character, long accountId, int elo) {
@@ -90,7 +95,7 @@ public class FakeCharacterDao implements CharacterDao {
                 continue;
             }
             if (filter.test(row)) {
-                result.add(CharacterEntity.fromCommonModel(row.accountId(), row.character()));
+                result.add(CharacterEntity.fromCommonModel(row.accountId(), row.character(), NO_APPEARANCE));
             }
         }
         return result;
@@ -99,7 +104,7 @@ public class FakeCharacterDao implements CharacterDao {
     @Override
     public Optional<CharacterEntity> findById(long characterId) {
         Row row = rows.get(characterId);
-        return Optional.ofNullable(row).map(r -> CharacterEntity.fromCommonModel(r.accountId(), r.character()));
+        return Optional.ofNullable(row).map(r -> CharacterEntity.fromCommonModel(r.accountId(), r.character(), NO_APPEARANCE));
     }
 
     @Override
@@ -119,7 +124,7 @@ public class FakeCharacterDao implements CharacterDao {
         List<CharacterEntity> result = new ArrayList<>();
         for (Row row : rows.values()) {
             if (row.accountId() == accountId) {
-                result.add(CharacterEntity.fromCommonModel(row.accountId(), row.character()));
+                result.add(CharacterEntity.fromCommonModel(row.accountId(), row.character(), NO_APPEARANCE));
             }
         }
         return result;

@@ -189,5 +189,11 @@ public class KryoConfig {
         kryo.register(CharacterPageResponse.class, new RecordSerializer<>(CharacterPageResponse.class));
         kryo.register(SetEquippedTitleRequest.class, new RecordSerializer<>(SetEquippedTitleRequest.class));
         kryo.register(SetEquippedTitleResponse.class, new RecordSerializer<>(SetEquippedTitleResponse.class));
+
+        // Character customization (Epic T1 / system design §23) — appended after SetEquippedTitleResponse so
+        // every positional ID above is untouched (system design §5, append-only), even though
+        // CreateCharacterRequest itself (which now carries an Appearance) was registered much earlier —
+        // record field changes don't move a type's own registration, only a brand-new type needs a new call.
+        kryo.register(Appearance.class, new RecordSerializer<>(Appearance.class));
     }
 }

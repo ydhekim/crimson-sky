@@ -3,6 +3,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.combat.PassiveEffects;
+import io.github.ydhekim.crimson_sky.common.model.Appearance;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.Loadout;
@@ -159,8 +160,15 @@ public class CharacterService {
         }
     }
 
-    public ServiceResult<Long> createCharacter(long accountId, int maxSlots, Character character) {
+    public ServiceResult<Long> createCharacter(long accountId, int maxSlots, Character character, Appearance appearance) {
         try {
+            // A pure input-shape rejection (system design §23) — runs before the slot/name checks, the same
+            // way allocateStatPoints' own negative-delta check runs before touching the database.
+            if (appearance == null || !appearance.isValid()) {
+                log.info("Character creation failed for account ID " + accountId + ": invalid appearance " + appearance);
+                return ServiceResult.failure(MessageCode.CHAR_INVALID_APPEARANCE);
+            }
+
             if (characterDao.getCharacterCount(accountId) >= maxSlots) {
                 log.info("Character creation failed for account ID " + accountId + ": Maximum character slots reached.");
                 return ServiceResult.failure(MessageCode.CHAR_MAX_SLOTS_REACHED);
@@ -171,7 +179,7 @@ public class CharacterService {
                 return ServiceResult.failure(MessageCode.CHAR_NAME_TAKEN);
             }
 
-            CharacterEntity newEntity = CharacterEntity.fromCommonModel(accountId, character);
+            CharacterEntity newEntity = CharacterEntity.fromCommonModel(accountId, character, appearance);
             long newId = characterDao.createCharacter(newEntity);
 
             if (newId > 0) {

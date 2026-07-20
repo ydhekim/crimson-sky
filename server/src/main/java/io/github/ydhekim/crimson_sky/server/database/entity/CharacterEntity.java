@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.server.database.entity;
 
+import io.github.ydhekim.crimson_sky.common.model.Appearance;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Faction;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
@@ -25,19 +26,23 @@ public record CharacterEntity(
     @Json Stats stats,
     @Json Inventory inventory,
     @Json Loadout loadout,
-    @Json Map<String, Integer> skillTree) {
+    @Json Map<String, Integer> skillTree,
+    @Json Appearance appearance) {
 
     public Character toCommonModel() {
+        // Unchanged — appearance deliberately does not ride the shared Character model (system design §23):
+        // nothing reads it back yet, same as equippedTitle not riding the general character read path.
         return new Character(id, accountId, name, faction, level, experience, maxHp, maxMp, maxStamina, baseDef, baseAtk,
             stats, inventory, loadout, skillTree != null ? skillTree : new HashMap<>());
     }
 
-    public static CharacterEntity fromCommonModel(long accountId, Character c) {
+    public static CharacterEntity fromCommonModel(long accountId, Character c, Appearance appearance) {
         return new CharacterEntity(
             c.id(), accountId, c.name(), c.faction(), c.level(), c.experience(),
             c.maxHp(), c.maxMp(), c.maxStamina(), c.baseDef(), c.baseAtk(),
             c.stats(), c.inventory(), c.loadout(),
-            c.skillTree() != null ? c.skillTree() : new HashMap<>()
+            c.skillTree() != null ? c.skillTree() : new HashMap<>(),
+            appearance
         );
     }
 }
