@@ -7,6 +7,7 @@ import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
 import io.github.ydhekim.crimson_sky.server.database.entity.CharacterEntity;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,6 +73,13 @@ public class FakeCharacterDao implements CharacterDao {
     @Override
     public List<CharacterEntity> findAllRankedOpponentCandidates(long characterId) {
         return candidates(characterId, row -> row.character().level() >= 25);
+    }
+
+    /** As with the ranked candidate queries, the fake can't compute ranked Elo — see that javadoc. Real
+     *  rank correctness is proven against SQL in CharacterDaoLadderRankTest, not through this fake. */
+    @Override
+    public int countRankedCharactersAboveEloAsOf(long characterId, int elo, Instant asOf) {
+        return 0;
     }
 
     private List<CharacterEntity> candidates(long characterId, java.util.function.Predicate<Row> filter) {

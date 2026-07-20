@@ -537,9 +537,9 @@ Seventh slice of the a–k expansion. Elo already updates on every battle today 
 
 **Monthly ladder — first-pass reward tiers, placeholder-caliber like every other number in this expansion:**
 - Calendar month, UTC boundary — same convention as the weekly quest.
-- Top 1: exclusive title + a rare pet/weapon + a large gold payout.
-- Top 2-10: gold + a Repair Token/Pet Care Kit bundle.
-- Top 11-100: modest gold.
+- Top 1: **500 gold + the existing curated Warhammer** (the same rare weapon `RewardService`'s milestone-bonus roll already grants — no new content invented ahead of its own epic). **The "exclusive title" originally planned here is deferred, corrected 2026-07-20 while implementing R3**: `characters.equipped_title` doesn't exist yet — it's part of §22/Epic S (achievements & character page), which hasn't been built. Revisit once that lands.
+- Top 2-10: 100 gold + one Repair Token + one Pet Care Kit.
+- Top 11-100: 30 gold.
 - Below top 100: no reward — ladder placement itself is the showcase (character page, §22), not a currency faucet.
 
 **Claiming mirrors the quest system exactly.** A claim request re-validates the player's standing server-side against the bounded-SUM computation at claim time (never trusts a client-reported rank), rejects if already claimed for the period:

@@ -163,5 +163,17 @@ public class KryoConfig {
         // Appended after AttackRejectedResponse so every positional ID above is untouched (system design
         // §5, append-only).
         kryo.register(BattleMode.class);
+
+        // Monthly ladder + claim (Epic R3 / system design §21) — live standing and the once-per-month
+        // tier claim. Appended after BattleMode so every positional ID above is untouched (system design
+        // §5, append-only). LadderStatus rides inside a LadderStatusResponse and LadderClaimResult inside a
+        // ClaimLadderRewardResponse, so both models are registered before the packets — the same way
+        // QuestProgress/QuestClaimResult are registered before their packets.
+        kryo.register(LadderStatus.class, new RecordSerializer<>(LadderStatus.class));
+        kryo.register(LadderClaimResult.class, new RecordSerializer<>(LadderClaimResult.class));
+        kryo.register(LadderStatusRequest.class, new RecordSerializer<>(LadderStatusRequest.class));
+        kryo.register(LadderStatusResponse.class, new RecordSerializer<>(LadderStatusResponse.class));
+        kryo.register(ClaimLadderRewardRequest.class, new RecordSerializer<>(ClaimLadderRewardRequest.class));
+        kryo.register(ClaimLadderRewardResponse.class, new RecordSerializer<>(ClaimLadderRewardResponse.class));
     }
 }
