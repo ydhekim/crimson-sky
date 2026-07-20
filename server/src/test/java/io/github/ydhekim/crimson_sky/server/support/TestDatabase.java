@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import io.github.ydhekim.crimson_sky.server.achievement.AchievementCriteriaType;
+import io.github.ydhekim.crimson_sky.server.achievement.AchievementScope;
 import org.jdbi.v3.core.Handle;
 import org.jdbi.v3.core.Jdbi;
 import org.jdbi.v3.jackson2.Jackson2Config;
@@ -58,6 +60,7 @@ public final class TestDatabase {
         jdbi.useHandle(handle -> {
             handle.execute("CREATE TABLE accounts ("
                 + "id INTEGER PRIMARY KEY, "
+                + "max_slots INTEGER NOT NULL DEFAULT 3, " // Epic Q's addCharacterSlots target (S2 test)
                 + "global_currency BIGINT NOT NULL DEFAULT 0)");
             // The trailing defaulted columns exist for CharacterDao's SELECT-*-mapped ranked candidate
             // queries (system design §21): the constructor mapper needs every CharacterEntity component
@@ -77,6 +80,7 @@ public final class TestDatabase {
                 + "base_atk INTEGER NOT NULL DEFAULT 0, "
                 + "unspent_stat_points INTEGER NOT NULL DEFAULT 0, "
                 + "skill_points INTEGER NOT NULL DEFAULT 0, "
+                + "bonus_daily_battles INTEGER NOT NULL DEFAULT 0, " // Epic Q's addBonusDailyBattles target (S2 test)
                 + "stats VARCHAR(2000), "
                 + "inventory VARCHAR(2000) NOT NULL, "
                 + "loadout VARCHAR(2000) NOT NULL, "
@@ -92,7 +96,38 @@ public final class TestDatabase {
                 + "elo_delta INTEGER NOT NULL, "
                 + "battle_mode VARCHAR(16) NOT NULL DEFAULT 'NORMAL', "
                 + "ranked_elo_delta INTEGER, "
+                + "turn_count INTEGER NOT NULL DEFAULT 0, " // FASTEST_WIN_TURNS' input (S1/S2, V15)
                 + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            // Achievement content + unlock ledger (S1/S2, V15). Only the columns findAllDefinitions reads are
+            // modelled; title/desc/icon (the read endpoint's) are omitted since no unlock-path test needs them.
+            handle.execute("CREATE TABLE achievement_definitions ("
+                + "id INTEGER PRIMARY KEY, "
+                + "key_name VARCHAR(50) NOT NULL, "
+                + "scope VARCHAR(16) NOT NULL, "
+                + "criteria_type VARCHAR(30) NOT NULL, "
+                + "criteria_params VARCHAR(2000) NOT NULL DEFAULT '{}', "
+                + "xp_reward INTEGER NOT NULL DEFAULT 0, "
+                + "gold_reward INTEGER NOT NULL DEFAULT 0, "
+                + "badge_id VARCHAR(50), "
+                + "title_id VARCHAR(50), "
+                + "bonus_character_slots INTEGER NOT NULL DEFAULT 0, "
+                + "bonus_daily_battles INTEGER NOT NULL DEFAULT 0, "
+                + "points INTEGER NOT NULL DEFAULT 10, "
+                + "hidden BOOLEAN NOT NULL DEFAULT FALSE, "
+                + "category VARCHAR(30))");
+            // H2 can't express Postgres's two partial unique indexes, so a generated character_key (NULL → -1)
+            // collapses both scopes into one plain unique index that enforces the identical invariant: one
+            // account-scope unlock per (account, achievement), one character-scope unlock per (account,
+            // achievement, character). Verified to make bare `ON CONFLICT DO NOTHING` no-op on a repeat.
+            handle.execute("CREATE TABLE achievement_unlocks ("
+                + "id SERIAL PRIMARY KEY, "
+                + "account_id INTEGER NOT NULL REFERENCES accounts (id), "
+                + "achievement_id INTEGER NOT NULL REFERENCES achievement_definitions (id), "
+                + "character_id INTEGER REFERENCES characters (id), "
+                + "character_key INTEGER GENERATED ALWAYS AS (COALESCE(character_id, -1)), "
+                + "unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
+            handle.execute("CREATE UNIQUE INDEX achv_unlock_uq "
+                + "ON achievement_unlocks (account_id, achievement_id, character_key)");
             // Quest claim ledger (Epic P / system design §19, V11). The real UNIQUE triple is modelled so a
             // second daily/weekly claim of the same period collides exactly as it would in production.
             handle.execute("CREATE TABLE quest_claims ("
@@ -159,6 +194,37 @@ public final class TestDatabase {
         return this;
     }
 
+    /**
+     * Seeds one {@code achievement_definitions} row (S1/S2, V15). {@code criteriaParamsJson} is the raw
+     * criteria blob (e.g. {@code {"threshold":1}}); the reward columns let a test assert an unlock's XP,
+     * gold, and Epic-Q bonus grants land where expected.
+     */
+    public TestDatabase withAchievementDefinition(long id, String keyName, AchievementScope scope,
+                                                  AchievementCriteriaType criteriaType, String criteriaParamsJson,
+                                                  int xpReward, int goldReward, int bonusCharacterSlots,
+                                                  int bonusDailyBattles, int points) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO achievement_definitions (id, key_name, scope, criteria_type, criteria_params, "
+                + "xp_reward, gold_reward, bonus_character_slots, bonus_daily_battles, points) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            id, keyName, scope.name(), criteriaType.name(), criteriaParamsJson,
+            xpReward, goldReward, bonusCharacterSlots, bonusDailyBattles, points));
+        return this;
+    }
+
+    /** How many {@code achievement_unlocks} rows an account holds (any scope). */
+    public int achievementUnlockCountOf(long accountId) {
+        return queryOne("SELECT COUNT(*) FROM achievement_unlocks WHERE account_id = ?", Integer.class, accountId);
+    }
+
+    public int maxSlotsOf(long accountId) {
+        return queryOne("SELECT max_slots FROM accounts WHERE id = ?", Integer.class, accountId);
+    }
+
+    public int bonusDailyBattlesOf(long characterId) {
+        return queryOne("SELECT bonus_daily_battles FROM characters WHERE id = ?", Integer.class, characterId);
+    }
+
     public long goldOf(long accountId) {
         return queryOne("SELECT global_currency FROM accounts WHERE id = ?", Long.class, accountId);
     }
@@ -197,6 +263,11 @@ public final class TestDatabase {
 
     public int battleHistoryRowCount() {
         return queryOne("SELECT COUNT(*) FROM battle_history", Integer.class);
+    }
+
+    /** The {@code turn_count} of the single {@code battle_history} row (S1/S2 end-to-end tests). */
+    public int turnCountOfOnlyRow() {
+        return queryOne("SELECT turn_count FROM battle_history", Integer.class);
     }
 
     /** The single {@code battle_history} row, for the tests that write exactly one. */

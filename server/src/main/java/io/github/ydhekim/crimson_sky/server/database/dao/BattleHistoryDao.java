@@ -5,6 +5,8 @@ import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * The audit row written for every resolved attack (story C1, system design §8).
@@ -18,8 +20,8 @@ import java.time.Instant;
  */
 public interface BattleHistoryDao {
 
-    @SqlUpdate("INSERT INTO battle_history (character_id, opponent_character_id, opponent_is_bot, won, gold_delta, experience_delta, elo_delta, battle_mode, ranked_elo_delta) " +
-        "VALUES (:characterId, :opponentCharacterId, :opponentIsBot, :won, :goldDelta, :expDelta, :eloDelta, :battleMode, :rankedEloDelta)")
+    @SqlUpdate("INSERT INTO battle_history (character_id, opponent_character_id, opponent_is_bot, won, gold_delta, experience_delta, elo_delta, battle_mode, ranked_elo_delta, turn_count) " +
+        "VALUES (:characterId, :opponentCharacterId, :opponentIsBot, :won, :goldDelta, :expDelta, :eloDelta, :battleMode, :rankedEloDelta, :turnCount)")
     void insert(@Bind("characterId") long characterId,
                 @Bind("opponentCharacterId") Long opponentCharacterId,
                 @Bind("opponentIsBot") boolean opponentIsBot,
@@ -28,7 +30,28 @@ public interface BattleHistoryDao {
                 @Bind("expDelta") long expDelta,
                 @Bind("eloDelta") int eloDelta,
                 @Bind("battleMode") String battleMode,
-                @Bind("rankedEloDelta") Integer rankedEloDelta);
+                @Bind("rankedEloDelta") Integer rankedEloDelta,
+                @Bind("turnCount") int turnCount);
+
+    /** All-time win count, no period bound (system design §22) — TOTAL_WINS' own live-computed input. */
+    @SqlQuery("SELECT COUNT(*) FROM battle_history WHERE character_id = :characterId AND won = true")
+    int countTotalWins(@Bind("characterId") long characterId);
+
+    /**
+     * The most recent {@code limit} outcomes, newest first (system design §22) — WIN_STREAK's input.
+     * {@code AchievementUnlockService} counts leading {@code true}s; a generous limit (50) is plenty for any
+     * realistic streak length without scanning the whole table.
+     */
+    @SqlQuery("SELECT won FROM battle_history WHERE character_id = :characterId ORDER BY created_at DESC LIMIT :limit")
+    List<Boolean> findRecentOutcomes(@Bind("characterId") long characterId, @Bind("limit") int limit);
+
+    /**
+     * The lowest {@code turn_count} among this character's wins, or empty if none yet (system design §22) —
+     * FASTEST_WIN_TURNS' input. {@code turn_count > 0} excludes rows written before this column existed
+     * (defaulted to 0), which would otherwise look like an unbeatable 0-turn win.
+     */
+    @SqlQuery("SELECT MIN(turn_count) FROM battle_history WHERE character_id = :characterId AND won = true AND turn_count > 0")
+    Optional<Integer> findFastestWinTurnCount(@Bind("characterId") long characterId);
 
     /**
      * Live ranked Elo as of {@code asOf} (system design §21) — never a stored column, always

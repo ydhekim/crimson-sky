@@ -19,8 +19,12 @@ public class ServiceRegistry {
 
 
     public ServiceRegistry(DatabaseManager dbManager) {
+        // Stateless — every method takes the caller's own Handle, so it needs no Jdbi/DAO of its own. Built
+        // first because both UserService and RewardService take it as a dependency.
+        AchievementUnlockService achievementUnlockService = new AchievementUnlockService();
+
         UserDao userDao = dbManager.getJdbi().onDemand(UserDao.class);
-        this.userService = new UserService(userDao);
+        this.userService = new UserService(userDao, dbManager.getJdbi(), achievementUnlockService);
 
         CharacterDao characterDao = dbManager.getJdbi().onDemand(CharacterDao.class);
         this.characterService = new CharacterService(characterDao);
@@ -28,9 +32,11 @@ public class ServiceRegistry {
         this.attackService = new AttackService(characterService, new BotFactory(), battleHistoryDao);
 
         // The odd one out: it takes the Jdbi itself, not an onDemand DAO. A reward spans `characters`,
-        // `accounts` and `battle_history`, and onDemand proxies open a connection per call — so the only
-        // way to get one transaction across all three is to attach the DAOs to a handle it owns.
-        this.rewardService = new RewardService(dbManager.getJdbi(), characterService, battleHistoryDao);
+        // `accounts`, `battle_history` and `achievement_unlocks`, and onDemand proxies open a connection per
+        // call — so the only way to get one transaction across all of them is to attach the DAOs to a handle
+        // it owns. The AchievementUnlockService rides that same handle for the end-of-transaction unlock.
+        this.rewardService = new RewardService(dbManager.getJdbi(), characterService, battleHistoryDao,
+            achievementUnlockService);
 
         // Same reason as RewardService: a learn/upgrade spans `characters` (skill points, skill tree,
         // inventory) and `accounts` (gold) atomically, so it needs the raw Jdbi, not onDemand proxies.

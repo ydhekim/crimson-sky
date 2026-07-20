@@ -210,6 +210,17 @@ public interface CharacterDao {
     @SqlUpdate("UPDATE characters SET bonus_daily_battles = bonus_daily_battles + :delta WHERE id = :characterId")
     void addBonusDailyBattles(@Bind("characterId") long characterId, @Bind("delta") int delta);
 
+    /**
+     * A pure additive XP grant (system design §22's achievement rewards) — deliberately does NOT recompute
+     * level the way {@link #applyBattleProgress} does. An achievement's XP reward compounds into the
+     * character's next real battle's level-up check rather than triggering an immediate cascading recompute
+     * here; extremely rare in practice (would need an achievement's own XP to itself cross a level threshold
+     * the triggering battle's XP didn't), and this keeps achievement evaluation from recursing into another
+     * achievement evaluation. A documented first-pass simplification, not an oversight.
+     */
+    @SqlUpdate("UPDATE characters SET experience = experience + :xpDelta WHERE id = :characterId")
+    void addExperience(@Bind("characterId") long characterId, @Bind("xpDelta") long xpDelta);
+
     @SqlUpdate("DELETE FROM characters WHERE account_id = :accountId AND name = :name")
     boolean deleteCharacter(@Bind("accountId") long accountId, @Bind("name") String name);
 

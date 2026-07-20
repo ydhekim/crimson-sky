@@ -231,6 +231,11 @@ public class FakeCharacterDao implements CharacterDao {
     }
 
     @Override
+    public void addExperience(long characterId, long xpDelta) {
+        throw new UnsupportedOperationException("achievement XP grants are written through the transaction's own DAO handle");
+    }
+
+    @Override
     public boolean deleteCharacter(long accountId, String name) {
         throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");
     }

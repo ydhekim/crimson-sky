@@ -3,6 +3,8 @@ package io.github.ydhekim.crimson_sky.server.service;
 import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
+import io.github.ydhekim.crimson_sky.server.achievement.AchievementCriteriaType;
+import io.github.ydhekim.crimson_sky.server.achievement.AchievementScope;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -54,7 +57,7 @@ class RewardServiceTest {
         db = TestDatabase.create().withAccount(ACCOUNT_A, STARTING_GOLD).withAccount(ACCOUNT_B, 0L);
         characterDao = new FakeCharacterDao();
         rewardService = new RewardService(db.jdbi(), new CharacterService(characterDao),
-            db.jdbi().onDemand(BattleHistoryDao.class));
+            db.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService());
     }
 
     /** Registers a character in both views: the DAO the service reads from, and the DB it writes to. */
@@ -312,5 +315,64 @@ class RewardServiceTest {
         assertEquals(STARTING_EXP, db.experienceOf(ATTACKER), "the character update rolled back too");
         assertEquals(1000, db.eloOf(ATTACKER));
         assertEquals(0, db.battleHistoryRowCount());
+    }
+
+    // --- currentStreak (§22 win-streak helper, pure) ------------------------------------------------
+
+    @Test
+    void currentStreakOfAnEmptyHistoryIsZero() {
+        assertEquals(0, RewardService.currentStreak(List.of()));
+    }
+
+    @Test
+    void currentStreakOfAllWinsIsTheFullLength() {
+        assertEquals(3, RewardService.currentStreak(List.of(true, true, true)));
+    }
+
+    @Test
+    void currentStreakStopsAtTheFirstLossAndDoesNotLookPastIt() {
+        // Newest-first, so a loss two-back caps the streak at the two leading wins — the older win is unseen.
+        assertEquals(2, RewardService.currentStreak(List.of(true, true, false, true)));
+    }
+
+    // --- end-to-end: a battle unlocks an achievement atomically with its own reward (§22) ------------
+
+    /** A won battle carrying an explicit turn count, for the achievement/turn-count end-to-end case. */
+    private AttackResult wonFightWithTurns(int turnCount) {
+        Array<Array<ResolvedAction>> turns = new Array<>();
+        for (int i = 0; i < turnCount; i++) {
+            turns.add(new Array<ResolvedAction>());
+        }
+        return new AttackResult(79L, ATTACKER, OPPONENT, "Boran", false, true, turns, BattleMode.NORMAL);
+    }
+
+    @Test
+    void aWinThatCrossesAnAchievementThresholdUnlocksItAtomicallyWithTheReward() {
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+        // FIRST_BLOOD: the first win (TOTAL_WINS >= 1) unlocks it, paying 40 gold on top of the battle's own.
+        db.withAchievementDefinition(100L, "FIRST_BLOOD", AchievementScope.CHARACTER,
+            AchievementCriteriaType.TOTAL_WINS, "{\"threshold\":1}", 0, 40, 0, 0, 10);
+
+        RewardOutcome outcome = rewardService.applyRewards(wonFightWithTurns(2));
+
+        assertEquals(1, db.achievementUnlockCountOf(ACCOUNT_A), "the first win unlocked FIRST_BLOOD");
+        assertEquals(2, db.turnCountOfOnlyRow(), "the battle_history row records this battle's turn count");
+        assertEquals(25, outcome.goldDelta(), "the reported outcome is the battle's own pay, not inflated by the unlock (§11)");
+        assertEquals(STARTING_GOLD + 25 + 40, db.goldOf(ACCOUNT_A),
+            "but the achievement's gold still lands, in the same transaction");
+    }
+
+    @Test
+    void aWinThatSatisfiesNoAchievementUnlocksNothing() {
+        seedCharacter(ATTACKER, ACCOUNT_A, "Ayla", 1000);
+        seedCharacter(OPPONENT, ACCOUNT_B, "Boran", 1000);
+        db.withAchievementDefinition(100L, "TEN_WINS", AchievementScope.CHARACTER,
+            AchievementCriteriaType.TOTAL_WINS, "{\"threshold\":10}", 0, 40, 0, 0, 10);
+
+        rewardService.applyRewards(realFight(true));
+
+        assertEquals(0, db.achievementUnlockCountOf(ACCOUNT_A), "one win is far short of the 10-win threshold");
+        assertEquals(STARTING_GOLD + 25, db.goldOf(ACCOUNT_A), "only the battle's own gold");
     }
 }

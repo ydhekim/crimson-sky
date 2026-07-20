@@ -7,6 +7,7 @@ import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackResponse;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
 import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
+import io.github.ydhekim.crimson_sky.server.service.AchievementUnlockService;
 import io.github.ydhekim.crimson_sky.server.service.AttackService;
 import io.github.ydhekim.crimson_sky.server.service.CharacterService;
 import io.github.ydhekim.crimson_sky.server.service.RewardService;
@@ -65,7 +66,8 @@ class AttackRequestHandlerTest {
         CharacterService characterService = new CharacterService(characterDao);
         return new AttackRequestHandler(
             new AttackService(characterService, new BotFactory(), db.jdbi().onDemand(BattleHistoryDao.class)),
-            new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class)));
+            new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class),
+                new AchievementUnlockService()));
     }
 
     @Test

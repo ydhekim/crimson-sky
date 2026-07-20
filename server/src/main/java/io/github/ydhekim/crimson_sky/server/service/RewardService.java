@@ -11,6 +11,7 @@ import io.github.ydhekim.crimson_sky.common.model.Rarity;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Skill;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
+import io.github.ydhekim.crimson_sky.server.achievement.CharacterAchievementFacts;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.RewardOutcome;
 import io.github.ydhekim.crimson_sky.server.database.dao.AccountDao;
@@ -112,17 +113,27 @@ public class RewardService {
      * normal-track Elo read. The transactional history insert still goes through a handle-attached DAO.
      */
     private final BattleHistoryDao battleHistoryDao;
+
+    /**
+     * The last step of the reward transaction (system design §22): a battle can push a character across a
+     * win-count/streak/level/fastest-win/item-grant threshold, so its achievements are evaluated inside the
+     * same {@code useTransaction} as the payout, unlocking-and-rewarding atomically with the battle itself.
+     */
+    private final AchievementUnlockService achievementUnlockService;
     private final Random random;
 
-    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao) {
-        this(jdbi, characterService, battleHistoryDao, new Random());
+    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao,
+                         AchievementUnlockService achievementUnlockService) {
+        this(jdbi, characterService, battleHistoryDao, achievementUnlockService, new Random());
     }
 
     /** Test seam: a seeded/stubbed {@link Random} makes the every-10 milestone roll reproducible. */
-    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao, Random random) {
+    public RewardService(Jdbi jdbi, CharacterService characterService, BattleHistoryDao battleHistoryDao,
+                         AchievementUnlockService achievementUnlockService, Random random) {
         this.jdbi = jdbi;
         this.characterService = characterService;
         this.battleHistoryDao = battleHistoryDao;
+        this.achievementUnlockService = achievementUnlockService;
         this.random = random;
     }
 
@@ -207,10 +218,12 @@ public class RewardService {
                     newLevel, outcome.statPointsGained(), outcome.skillPointsGained());
                 handle.attach(AccountDao.class)
                     .addGlobalCurrency(accountId, outcome.goldDelta());
-                handle.attach(BattleHistoryDao.class).insert(
+                BattleHistoryDao txBattleHistoryDao = handle.attach(BattleHistoryDao.class);
+                txBattleHistoryDao.insert(
                     result.characterId(), result.opponentCharacterId(), result.opponentIsBot(),
                     result.won(), outcome.goldDelta(), outcome.expDelta(), outcome.eloDelta(),
-                    mode.name(), mode == BattleMode.RANKED ? outcome.eloDelta() : null);
+                    mode.name(), mode == BattleMode.RANKED ? outcome.eloDelta() : null,
+                    result.turns() != null ? result.turns().size : 0);
 
                 // Only touch the inventory column when something actually changed it — a read-modify-write
                 // under the row lock, in the same transaction, so an item grant or a durability decrement
@@ -223,6 +236,19 @@ public class RewardService {
                     updateInventory(characterDao, result.characterId(), firedWeaponIds, firedPetIds,
                         consumableTriggerCounts, bonusWeapons);
                 }
+
+                // Last step (§22): evaluate this character's achievements against the facts this battle just
+                // produced — win count/streak/fastest win read live off the row inserted above, level is the
+                // freshly-recomputed one, and the item-grant fact is exactly this battle's milestone weapons.
+                // Any unlock's reward lands in this same transaction; the battle's own reported outcome is not
+                // inflated by it (§9/§11), so the AttackResponse still equals what the reward formulas computed.
+                CharacterAchievementFacts facts = new CharacterAchievementFacts(
+                    txBattleHistoryDao.countTotalWins(result.characterId()),
+                    currentStreak(txBattleHistoryDao.findRecentOutcomes(result.characterId(), 50)),
+                    txBattleHistoryDao.findFastestWinTurnCount(result.characterId()).orElse(null),
+                    newLevel,
+                    bonusWeapons.stream().map(Weapon::rarity).toList());
+                achievementUnlockService.evaluateCharacterAchievements(handle, accountId, result.characterId(), facts);
             });
         } catch (Exception e) {
             log.error("Reward transaction rolled back for battle " + result.battleId() + " / character "
@@ -261,6 +287,18 @@ public class RewardService {
             level++;
         }
         return level;
+    }
+
+    /** Leading true-run length of a newest-first outcome list (system design §22) — the current win streak. */
+    static int currentStreak(List<Boolean> recentOutcomesNewestFirst) {
+        int streak = 0;
+        for (boolean won : recentOutcomesNewestFirst) {
+            if (!won) {
+                break;
+            }
+            streak++;
+        }
+        return streak;
     }
 
     /** A level is a bonus-roll milestone when it is one of 10/20/30/40/50 (system design §15). */

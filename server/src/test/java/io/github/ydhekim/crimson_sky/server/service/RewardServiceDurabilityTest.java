@@ -114,7 +114,7 @@ class RewardServiceDurabilityTest {
         AttackService attackService = new AttackService(
             characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
         RewardService rewardService = new RewardService(db.jdbi(), characterService,
-            db.jdbi().onDemand(BattleHistoryDao.class));
+            db.jdbi().onDemand(BattleHistoryDao.class), new AchievementUnlockService());
 
         Optional<AttackResult> result = attackService.attack(ATTACKER, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
