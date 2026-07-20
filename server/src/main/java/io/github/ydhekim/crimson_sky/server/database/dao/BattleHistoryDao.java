@@ -1,5 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.database.dao;
 
+import io.github.ydhekim.crimson_sky.server.database.entity.RecentMatchRow;
+import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
@@ -36,6 +38,23 @@ public interface BattleHistoryDao {
     /** All-time win count, no period bound (system design §22) — TOTAL_WINS' own live-computed input. */
     @SqlQuery("SELECT COUNT(*) FROM battle_history WHERE character_id = :characterId AND won = true")
     int countTotalWins(@Bind("characterId") long characterId);
+
+    /** All-time battle count, win or lose (system design §22) — the denominator for win percentage. */
+    @SqlQuery("SELECT COUNT(*) FROM battle_history WHERE character_id = :characterId")
+    int countTotalBattles(@Bind("characterId") long characterId);
+
+    /**
+     * The most recent {@code limit} battles with enough detail for a match-history list (system design §22).
+     * {@code opponentName} is {@code NULL} for a bot opponent (no {@code characters} row to join) or a
+     * since-deleted real character — {@link io.github.ydhekim.crimson_sky.server.service.CharacterPageService}
+     * is what turns that {@code NULL} into a display-safe placeholder, not this query.
+     */
+    @RegisterConstructorMapper(RecentMatchRow.class)
+    @SqlQuery("SELECT bh.won AS won, bh.battle_mode AS battleMode, bh.elo_delta AS eloDelta, " +
+        "bh.ranked_elo_delta AS rankedEloDelta, bh.turn_count AS turnCount, bh.created_at AS occurredAt, " +
+        "c.name AS opponentName FROM battle_history bh LEFT JOIN characters c ON bh.opponent_character_id = c.id " +
+        "WHERE bh.character_id = :characterId ORDER BY bh.created_at DESC LIMIT :limit")
+    List<RecentMatchRow> findRecentMatches(@Bind("characterId") long characterId, @Bind("limit") int limit);
 
     /**
      * The most recent {@code limit} outcomes, newest first (system design §22) — WIN_STREAK's input.

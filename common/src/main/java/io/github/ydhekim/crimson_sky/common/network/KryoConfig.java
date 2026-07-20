@@ -175,5 +175,19 @@ public class KryoConfig {
         kryo.register(LadderStatusResponse.class, new RecordSerializer<>(LadderStatusResponse.class));
         kryo.register(ClaimLadderRewardRequest.class, new RecordSerializer<>(ClaimLadderRewardRequest.class));
         kryo.register(ClaimLadderRewardResponse.class, new RecordSerializer<>(ClaimLadderRewardResponse.class));
+
+        // Character page + equipped title (Epic S3/S4 / system design §22) — the read-only page aggregate and
+        // the title equip/clear. Appended after ClaimLadderRewardResponse so every positional ID above is
+        // untouched (system design §5, append-only). Models before packets — the same convention
+        // LadderStatus/QuestProgress follow, since each model rides inside a response: RecentMatch inside a
+        // CharacterStatistics inside a CharacterPage, CharacterPageAchievement in that same page.
+        kryo.register(RecentMatch.class, new RecordSerializer<>(RecentMatch.class));
+        kryo.register(CharacterStatistics.class, new RecordSerializer<>(CharacterStatistics.class));
+        kryo.register(CharacterPageAchievement.class, new RecordSerializer<>(CharacterPageAchievement.class));
+        kryo.register(CharacterPage.class, new RecordSerializer<>(CharacterPage.class));
+        kryo.register(CharacterPageRequest.class, new RecordSerializer<>(CharacterPageRequest.class));
+        kryo.register(CharacterPageResponse.class, new RecordSerializer<>(CharacterPageResponse.class));
+        kryo.register(SetEquippedTitleRequest.class, new RecordSerializer<>(SetEquippedTitleRequest.class));
+        kryo.register(SetEquippedTitleResponse.class, new RecordSerializer<>(SetEquippedTitleResponse.class));
     }
 }

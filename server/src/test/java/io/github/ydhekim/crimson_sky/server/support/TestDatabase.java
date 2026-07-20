@@ -81,6 +81,7 @@ public final class TestDatabase {
                 + "unspent_stat_points INTEGER NOT NULL DEFAULT 0, "
                 + "skill_points INTEGER NOT NULL DEFAULT 0, "
                 + "bonus_daily_battles INTEGER NOT NULL DEFAULT 0, " // Epic Q's addBonusDailyBattles target (S2 test)
+                + "equipped_title VARCHAR(50), " // S4's equip target (V16); NULL when nothing is worn
                 + "stats VARCHAR(2000), "
                 + "inventory VARCHAR(2000) NOT NULL, "
                 + "loadout VARCHAR(2000) NOT NULL, "
@@ -98,11 +99,20 @@ public final class TestDatabase {
                 + "ranked_elo_delta INTEGER, "
                 + "turn_count INTEGER NOT NULL DEFAULT 0, " // FASTEST_WIN_TURNS' input (S1/S2, V15)
                 + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
-            // Achievement content + unlock ledger (S1/S2, V15). Only the columns findAllDefinitions reads are
-            // modelled; title/desc/icon (the read endpoint's) are omitted since no unlock-path test needs them.
+            // Localization key catalog (V2/V4). Only the id ↔ key_name pair the character-page join needs is
+            // modelled; the localization_values fan-out is irrelevant to a character page's loc-key reads.
+            handle.execute("CREATE TABLE localization_keys ("
+                + "id INTEGER PRIMARY KEY, "
+                + "key_name VARCHAR(100) NOT NULL, "
+                + "group_type VARCHAR(30))");
+            // Achievement content + unlock ledger (S1/S2, V15; title/desc loc-key FKs added for S3's page join).
+            // Only the columns findAllDefinitions / getAchievementsForCharacterPage read are modelled; icon
+            // (the account read endpoint's) stays omitted since no server test here reads it.
             handle.execute("CREATE TABLE achievement_definitions ("
                 + "id INTEGER PRIMARY KEY, "
                 + "key_name VARCHAR(50) NOT NULL, "
+                + "title_loc_key INTEGER REFERENCES localization_keys (id), "
+                + "desc_loc_key INTEGER REFERENCES localization_keys (id), "
                 + "scope VARCHAR(16) NOT NULL, "
                 + "criteria_type VARCHAR(30) NOT NULL, "
                 + "criteria_params VARCHAR(2000) NOT NULL DEFAULT '{}', "
@@ -210,6 +220,70 @@ public final class TestDatabase {
             id, keyName, scope.name(), criteriaType.name(), criteriaParamsJson,
             xpReward, goldReward, bonusCharacterSlots, bonusDailyBattles, points));
         return this;
+    }
+
+    /**
+     * Seeds one {@code achievement_definitions} row wired for the S3 character-page join (system design §22):
+     * two {@code localization_keys} (derived from {@code keyName}) plus {@code badge_id}/{@code title_id}/
+     * {@code hidden}/{@code category}, the columns the S1/S2 overload leaves off. The loc keys are what let
+     * this achievement appear at all in {@code getAchievementsForCharacterPage}'s inner join; a {@code titleId}
+     * makes it a title-granting achievement for S4's equip tests.
+     */
+    public TestDatabase withPageAchievementDefinition(long id, String keyName, AchievementScope scope,
+                                                      AchievementCriteriaType criteriaType, String criteriaParamsJson,
+                                                      int points, String badgeId, String titleId, boolean hidden,
+                                                      String category) {
+        jdbi.useHandle(handle -> {
+            long titleKeyId = id * 2;      // deterministic, collision-free per achievement id
+            long descKeyId = id * 2 + 1;
+            handle.execute("INSERT INTO localization_keys (id, key_name, group_type) VALUES (?, ?, 'ACHIEVEMENT')",
+                titleKeyId, keyName + "_TITLE");
+            handle.execute("INSERT INTO localization_keys (id, key_name, group_type) VALUES (?, ?, 'ACHIEVEMENT')",
+                descKeyId, keyName + "_DESC");
+            handle.execute(
+                "INSERT INTO achievement_definitions (id, key_name, title_loc_key, desc_loc_key, scope, "
+                    + "criteria_type, criteria_params, points, badge_id, title_id, hidden, category) "
+                    + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, keyName, titleKeyId, descKeyId, scope.name(), criteriaType.name(), criteriaParamsJson,
+                points, badgeId, titleId, hidden, category);
+        });
+        return this;
+    }
+
+    /**
+     * Seeds one {@code achievement_unlocks} row directly (S3/S4 tests). {@code characterId} is {@code null}
+     * for an ACCOUNT-scope unlock and a character id for a CHARACTER-scope one — the same shape the unlock
+     * engine writes, letting a page/equip test start from an already-unlocked achievement without running it.
+     */
+    public TestDatabase withAchievementUnlock(long accountId, long achievementId, Long characterId) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO achievement_unlocks (account_id, achievement_id, character_id) VALUES (?, ?, ?)",
+            accountId, achievementId, characterId));
+        return this;
+    }
+
+    /**
+     * Seeds one fully-specified {@code battle_history} row (S3 match-history tests). Unlike
+     * {@link #withBattleHistory}, this controls the opponent ({@code null} → a bot fight), battle mode, Elo
+     * deltas and turn count — everything a {@code RecentMatch} projects. {@code rankedEloDelta} is {@code null}
+     * for a NORMAL battle, mirroring the real column.
+     */
+    public TestDatabase withMatchHistory(long characterId, Long opponentCharacterId, boolean won, String battleMode,
+                                         int eloDelta, Integer rankedEloDelta, int turnCount, Instant createdAt) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO battle_history (character_id, opponent_character_id, opponent_is_bot, won, gold_delta, "
+                + "experience_delta, elo_delta, battle_mode, ranked_elo_delta, turn_count, created_at) "
+                + "VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?)",
+            characterId, opponentCharacterId, opponentCharacterId == null, won, eloDelta, battleMode,
+            rankedEloDelta, turnCount, Timestamp.from(createdAt)));
+        return this;
+    }
+
+    /** The currently equipped title id for a character (S4 tests), or {@code null} when the column is NULL. */
+    public String equippedTitleOf(long characterId) {
+        return jdbi.withHandle(handle -> handle
+            .select("SELECT equipped_title FROM characters WHERE id = ?", characterId)
+            .mapTo(String.class).findOne().orElse(null));
     }
 
     /** How many {@code achievement_unlocks} rows an account holds (any scope). */

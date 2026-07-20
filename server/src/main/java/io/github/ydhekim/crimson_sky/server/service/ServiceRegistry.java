@@ -13,6 +13,7 @@ public class ServiceRegistry {
     private final ShopService shopService;
     private final QuestService questService;
     private final LadderService ladderService;
+    private final CharacterPageService characterPageService;
     private final LocalizationService localizationService;
     private final AchievementService achievementService;
     private final AccountService accountService;
@@ -55,6 +56,11 @@ public class ServiceRegistry {
         // `accounts.global_currency` or `characters.inventory` atomically, so it needs the raw Jdbi.
         this.ladderService = new LadderService(dbManager.getJdbi(), characterService);
 
+        // Same handle-attach convention as LadderService (system design §22): a page assembly reads across
+        // battle_history, achievement_definitions/achievement_unlocks and characters, and the title-equip
+        // write rides the same convention for consistency — so it takes the raw Jdbi, not onDemand proxies.
+        this.characterPageService = new CharacterPageService(dbManager.getJdbi(), characterService);
+
         LocalizationDao localizationDao = dbManager.getJdbi().onDemand(LocalizationDao.class);
         this.localizationService = new LocalizationService(localizationDao);
 
@@ -95,6 +101,10 @@ public class ServiceRegistry {
 
     public LadderService getLadderService() {
         return ladderService;
+    }
+
+    public CharacterPageService getCharacterPageService() {
+        return characterPageService;
     }
 
     public LocalizationService getLocalizationService() {

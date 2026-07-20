@@ -236,6 +236,16 @@ public class FakeCharacterDao implements CharacterDao {
     }
 
     @Override
+    public Optional<String> getEquippedTitle(long characterId) {
+        throw new UnsupportedOperationException("equipped-title reads are verified against real SQL, not this fake");
+    }
+
+    @Override
+    public void setEquippedTitle(long characterId, String titleId) {
+        throw new UnsupportedOperationException("equipped-title writes are verified against real SQL, not this fake");
+    }
+
+    @Override
     public boolean deleteCharacter(long accountId, String name) {
         throw new UnsupportedOperationException("not exercised by combat/matchmaking tests");
     }

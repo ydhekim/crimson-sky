@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.database.dao;
 
 import io.github.ydhekim.crimson_sky.common.model.AccountAchievement;
+import io.github.ydhekim.crimson_sky.common.model.CharacterPageAchievement;
 import io.github.ydhekim.crimson_sky.server.database.entity.AchievementDefinitionEntity;
 import org.jdbi.v3.sqlobject.config.RegisterConstructorMapper;
 import org.jdbi.v3.sqlobject.customizer.Bind;
@@ -59,4 +60,30 @@ public interface AchievementDao {
         "VALUES (:accountId, :achievementId, :characterId) ON CONFLICT DO NOTHING")
     int insertCharacterUnlockIgnoringConflict(@Bind("accountId") long accountId, @Bind("achievementId") long achievementId,
                                               @Bind("characterId") long characterId);
+
+    /**
+     * Every achievement's unlock status as this character's page should show it (system design §22): an
+     * ACCOUNT-scope achievement counts if the account has ever unlocked it; a CHARACTER-scope achievement
+     * counts only if <i>this</i> character unlocked it — the same OR-by-scope join
+     * {@code AchievementUnlockService} uses to decide which partial index applies, read instead of written here.
+     */
+    @RegisterConstructorMapper(CharacterPageAchievement.class)
+    @SqlQuery("SELECT ad.key_name AS keyName, lk_t.key_name AS titleLocKey, lk_d.key_name AS descLocKey, " +
+        "ad.points AS points, ad.badge_id AS badgeId, ad.hidden AS hidden, ad.category AS category, " +
+        "(au.id IS NOT NULL) AS isUnlocked, au.unlocked_at AS unlockedAt " +
+        "FROM achievement_definitions ad " +
+        "JOIN localization_keys lk_t ON ad.title_loc_key = lk_t.id " +
+        "JOIN localization_keys lk_d ON ad.desc_loc_key = lk_d.id " +
+        "LEFT JOIN achievement_unlocks au ON ad.id = au.achievement_id AND au.account_id = :accountId " +
+        "  AND ((ad.scope = 'ACCOUNT' AND au.character_id IS NULL) OR (ad.scope = 'CHARACTER' AND au.character_id = :characterId)) " +
+        "ORDER BY ad.id")
+    List<CharacterPageAchievement> getAchievementsForCharacterPage(@Bind("accountId") long accountId,
+                                                                    @Bind("characterId") long characterId);
+
+    /** Whether {@code titleId} is unlocked for this account/character (system design §22) — S4's write-gate. */
+    @SqlQuery("SELECT EXISTS (SELECT 1 FROM achievement_definitions ad JOIN achievement_unlocks au ON ad.id = au.achievement_id " +
+        "WHERE ad.title_id = :titleId AND au.account_id = :accountId " +
+        "AND ((ad.scope = 'ACCOUNT' AND au.character_id IS NULL) OR (ad.scope = 'CHARACTER' AND au.character_id = :characterId)))")
+    boolean isTitleUnlockedFor(@Bind("titleId") String titleId, @Bind("accountId") long accountId,
+                               @Bind("characterId") long characterId);
 }
