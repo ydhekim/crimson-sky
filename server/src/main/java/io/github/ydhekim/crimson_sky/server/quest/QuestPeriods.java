@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.temporal.TemporalAdjusters;
 
@@ -40,5 +41,23 @@ public final class QuestPeriods {
         LocalDate today = LocalDate.now(clock);
         LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         return monday.atStartOfDay(ZoneOffset.UTC).toInstant();
+    }
+
+    /** UTC midnight of the 1st of this month (system design §21) — the ladder's live-standing boundary. */
+    public static Instant startOfMonth() {
+        return startOfMonth(Clock.systemUTC());
+    }
+
+    /** UTC midnight of the 1st of last month (system design §21) — the period a ladder claim targets. */
+    public static Instant startOfPreviousMonth() {
+        return startOfPreviousMonth(Clock.systemUTC());
+    }
+
+    static Instant startOfMonth(Clock clock) {
+        return YearMonth.now(clock).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    }
+
+    static Instant startOfPreviousMonth(Clock clock) {
+        return YearMonth.now(clock).minusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     }
 }

@@ -12,6 +12,7 @@ import org.jdbi.v3.sqlobject.statement.GetGeneratedKeys;
 import org.jdbi.v3.sqlobject.statement.SqlQuery;
 import org.jdbi.v3.sqlobject.statement.SqlUpdate;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -68,6 +69,17 @@ public interface CharacterDao {
      */
     @SqlQuery("SELECT * FROM characters WHERE id <> :characterId AND level >= 25")
     List<CharacterEntity> findAllRankedOpponentCandidates(@Bind("characterId") long characterId);
+
+    /**
+     * How many level-25+ characters (other than characterId) have a live-computed ranked Elo, as of asOf,
+     * strictly greater than elo (system design §21) — one more than this count is the character's ladder
+     * rank. Reuses the same correlated-subquery shape as findRankedOpponentCandidatesInEloRange.
+     */
+    @SqlQuery("SELECT COUNT(*) FROM characters c WHERE c.id <> :characterId AND c.level >= 25 " +
+        "AND (1000 + COALESCE((SELECT SUM(bh.ranked_elo_delta) FROM battle_history bh " +
+        "WHERE bh.character_id = c.id AND bh.battle_mode = 'RANKED' AND bh.created_at <= :asOf), 0)) > :elo")
+    int countRankedCharactersAboveEloAsOf(@Bind("characterId") long characterId, @Bind("elo") int elo,
+                                          @Bind("asOf") Instant asOf);
 
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE name = :name)")
     boolean isNameTaken(@Bind("name") String name);

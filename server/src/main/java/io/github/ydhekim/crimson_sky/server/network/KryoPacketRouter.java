@@ -19,6 +19,7 @@ public class KryoPacketRouter implements PacketRouter {
                             SkillTreeService skillTreeService,
                             ShopService shopService,
                             QuestService questService,
+                            LadderService ladderService,
                             LocalizationService localizationService,
                             AchievementService achievementService,
                             AccountService accountService) {
@@ -36,6 +37,8 @@ public class KryoPacketRouter implements PacketRouter {
         handlers.put(BuyResetTokenRequest.class, new BuyResetTokenRequestHandler(shopService, characterService));
         handlers.put(QuestStatusRequest.class, new QuestStatusRequestHandler(questService, characterService));
         handlers.put(ClaimQuestRequest.class, new ClaimQuestRequestHandler(questService, characterService));
+        handlers.put(LadderStatusRequest.class, new LadderStatusRequestHandler(ladderService, characterService));
+        handlers.put(ClaimLadderRewardRequest.class, new ClaimLadderRewardRequestHandler(ladderService, characterService));
         handlers.put(LocalizationRequest.class, new LocalizationRequestHandler(localizationService));
         handlers.put(AchievementListRequest.class, new AchievementListRequestHandler(achievementService));
         handlers.put(SaveAccountSettingsRequest.class, new SaveAccountSettingsRequestHandler(accountService));

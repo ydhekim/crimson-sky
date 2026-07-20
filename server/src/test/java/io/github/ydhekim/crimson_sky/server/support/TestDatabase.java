@@ -102,6 +102,14 @@ public final class TestDatabase {
                 + "period_start TIMESTAMP NOT NULL, "
                 + "claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                 + "UNIQUE (character_id, quest_id, period_start))");
+            // Ladder claim ledger (Epic R3 / system design §21, V14). The real UNIQUE pair is modelled so a
+            // second claim of the same month collides exactly as it would in production.
+            handle.execute("CREATE TABLE ladder_claims ("
+                + "id SERIAL PRIMARY KEY, "
+                + "character_id INTEGER NOT NULL REFERENCES characters (id), "
+                + "period_start TIMESTAMP NOT NULL, "
+                + "claimed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "UNIQUE (character_id, period_start))");
         });
 
         return new TestDatabase(jdbi);
@@ -259,6 +267,23 @@ public final class TestDatabase {
     public int questClaimCountOf(long characterId, String questId) {
         return queryOne("SELECT COUNT(*) FROM quest_claims WHERE character_id = ? AND quest_id = ?",
             Integer.class, characterId, questId);
+    }
+
+    /**
+     * Seeds one {@code ladder_claims} row (Epic R3 / system design §21), mirroring {@link #withQuestClaim}.
+     * {@code periodStart} is the start of the month being claimed, so a second claim of the same month
+     * collides on the {@code UNIQUE} pair exactly as it would in production.
+     */
+    public TestDatabase withLadderClaim(long characterId, Instant periodStart) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO ladder_claims (character_id, period_start) VALUES (?, ?)",
+            characterId, Timestamp.from(periodStart)));
+        return this;
+    }
+
+    /** How many {@code ladder_claims} rows a character holds (any period). */
+    public int ladderClaimCountOf(long characterId) {
+        return queryOne("SELECT COUNT(*) FROM ladder_claims WHERE character_id = ?", Integer.class, characterId);
     }
 
     /**

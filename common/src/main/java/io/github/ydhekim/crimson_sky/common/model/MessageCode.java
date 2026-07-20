@@ -40,5 +40,10 @@ public enum MessageCode {
     DAILY_BATTLE_CAP_REACHED,
 
     // Ranked ladder (system design §21)
-    RANKED_LEVEL_GATE_NOT_MET
+    RANKED_LEVEL_GATE_NOT_MET,
+
+    // Ranked ladder claim (system design §21)
+    LADDER_NOT_RANKED_ELIGIBLE,
+    LADDER_NO_REWARD_THIS_RANK,
+    LADDER_ALREADY_CLAIMED
 }
