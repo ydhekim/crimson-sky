@@ -5,6 +5,7 @@ import com.badlogic.gdx.utils.Logger;
 import io.github.ydhekim.crimson_sky.combat.BattleEngine;
 import io.github.ydhekim.crimson_sky.combat.BattleParticipant;
 import io.github.ydhekim.crimson_sky.combat.BattleSession;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import io.github.ydhekim.crimson_sky.server.combat.BotFactory;
@@ -44,6 +45,9 @@ public class AttackService {
 
     /** Base battles a character may fight per UTC day before the cap rejects an attack (system design §20). */
     private static final int BASE_DAILY_BATTLE_CAP = 5;
+
+    /** Minimum character level to queue a RANKED attack (system design §21). */
+    static final int RANKED_LEVEL_REQUIREMENT = 25;
 
     /**
      * Correlation id for a battle that exists only for the life of one request. Not a database key and
@@ -94,27 +98,47 @@ public class AttackService {
     }
 
     /**
+     * Whether {@code characterId} currently qualifies for ranked matchmaking (system design §21) — the
+     * guard {@code AttackRequestHandler} checks before calling {@link #attack} with
+     * {@link BattleMode#RANKED}, the same "check first, reject early" shape the daily-battle-cap check
+     * already uses (§20).
+     */
+    public boolean isRankedEligible(long characterId) {
+        ServiceResult<Character> character = characterService.getCharacter(characterId);
+        return character.success() && character.data().level() >= RANKED_LEVEL_REQUIREMENT;
+    }
+
+    /**
      * Fights {@code characterId} against a chosen opponent and resolves the entire battle before
      * returning. The caller must have already confirmed the character belongs to the connection's
      * account.
      *
      * @return the full internal outcome, or empty when the attacking character can't be loaded
      */
-    public Optional<AttackResult> attack(long characterId) {
+    public Optional<AttackResult> attack(long characterId, BattleMode mode) {
         ServiceResult<Character> attacker = characterService.getCharacter(characterId);
         if (!attacker.success()) {
             log.info("Refusing attack: character " + characterId + " could not be loaded.");
             return Optional.empty();
         }
 
-        ServiceResult<Integer> elo = characterService.getElo(characterId);
-        if (!elo.success()) {
-            log.info("Refusing attack: Elo lookup failed for character " + characterId + ".");
-            return Optional.empty();
+        // A RANKED attack matches on the live-computed ranked track (system design §21) — a COALESCEd
+        // SQL aggregate that always yields a number, so it has no failure branch to mirror the normal
+        // track's.
+        int elo;
+        if (mode == BattleMode.RANKED) {
+            elo = battleHistoryDao.getRankedElo(characterId);
+        } else {
+            ServiceResult<Integer> eloResult = characterService.getElo(characterId);
+            if (!eloResult.success()) {
+                log.info("Refusing attack: Elo lookup failed for character " + characterId + ".");
+                return Optional.empty();
+            }
+            elo = eloResult.data();
         }
 
-        Opponent opponent = selectOpponent(characterId, elo.data());
-        return Optional.of(resolveBattle(attacker.data(), opponent));
+        Opponent opponent = selectOpponent(characterId, elo, mode);
+        return Optional.of(resolveBattle(attacker.data(), opponent, mode));
     }
 
     /** A chosen opponent plus the one fact the client must never learn about it. */
@@ -126,16 +150,23 @@ public class AttackService {
         }
     }
 
-    /** Elo band → unbounded → bot, resolving entirely within this call (system design §7). */
-    private Opponent selectOpponent(long characterId, int elo) {
-        Optional<Character> inRange = pickRandom(
-            characterService.findOpponentCandidates(characterId, elo, BASE_ELO_RANGE), characterId);
+    /**
+     * Elo band → unbounded → bot, resolving entirely within this call (system design §7). Ranked mode
+     * (§21) runs the identical algorithm against the level-25+ pool, keyed off the live ranked Elo the
+     * caller passed in; the bot fallback needs no branch — {@code BotFactory} is already
+     * Elo-parameterized, so it calibrates to whichever track's number it is handed.
+     */
+    private Opponent selectOpponent(long characterId, int elo, BattleMode mode) {
+        Optional<Character> inRange = pickRandom(mode == BattleMode.RANKED
+            ? characterService.findRankedOpponentCandidates(characterId, elo, BASE_ELO_RANGE)
+            : characterService.findOpponentCandidates(characterId, elo, BASE_ELO_RANGE), characterId);
         if (inRange.isPresent()) {
             return new Opponent(inRange.get(), false);
         }
 
-        Optional<Character> anyOpponent = pickRandom(
-            characterService.findAllOpponentCandidates(characterId), characterId);
+        Optional<Character> anyOpponent = pickRandom(mode == BattleMode.RANKED
+            ? characterService.findAllRankedOpponentCandidates(characterId)
+            : characterService.findAllOpponentCandidates(characterId), characterId);
         if (anyOpponent.isPresent()) {
             log.info("No opponent within ±" + BASE_ELO_RANGE + " Elo of character " + characterId
                 + "; widened to an unbounded range.");
@@ -167,7 +198,7 @@ public class AttackService {
      * Builds a throwaway engine/session/participant pair and runs the battle to completion. Nothing is
      * registered anywhere: the battle is over by the time this returns.
      */
-    private AttackResult resolveBattle(Character attacker, Opponent opponent) {
+    private AttackResult resolveBattle(Character attacker, Opponent opponent, BattleMode mode) {
         long battleId = nextBattleId.getAndIncrement();
 
         Engine engine = new Engine();
@@ -185,7 +216,7 @@ public class AttackService {
         AttackResult result = new AttackResult(
             battleId, attacker.id(), opponent.persistedId(), opponent.character().name(),
             opponent.isBot(), won,
-            battleEngine.turnHistoryOf(attackerParticipant));
+            battleEngine.turnHistoryOf(attackerParticipant), mode);
 
         log.info("Battle " + battleId + ": character " + attacker.id() + " "
             + (won ? "defeated " : "lost to ") + opponent.character().name()

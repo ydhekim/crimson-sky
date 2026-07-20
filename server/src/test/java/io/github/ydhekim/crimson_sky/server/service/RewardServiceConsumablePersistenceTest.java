@@ -2,8 +2,10 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
+import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
 import io.github.ydhekim.crimson_sky.server.support.HeadlessGdx;
@@ -71,7 +73,8 @@ class RewardServiceConsumablePersistenceTest {
             .withAccount(ACCOUNT_A, 0L).withAccount(ACCOUNT_B, 0L)
             .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
             .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
-        rewardService = new RewardService(db.jdbi(), new CharacterService(dao));
+        rewardService = new RewardService(db.jdbi(), new CharacterService(dao),
+            db.jdbi().onDemand(BattleHistoryDao.class));
     }
 
     private static ResolvedAction potionSip() {
@@ -90,7 +93,7 @@ class RewardServiceConsumablePersistenceTest {
     @SafeVarargs
     private String rewardBattleOf(Array<ResolvedAction>... turns) {
         AttackResult result = new AttackResult(
-            1L, ATTACKER, OPPONENT, "Boran", false, true, Array.with(turns));
+            1L, ATTACKER, OPPONENT, "Boran", false, true, Array.with(turns), BattleMode.NORMAL);
         rewardService.applyRewards(result);
         return db.inventoryJsonOf(ATTACKER);
     }

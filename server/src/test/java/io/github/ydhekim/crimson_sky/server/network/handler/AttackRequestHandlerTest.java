@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRejectedResponse;
 import io.github.ydhekim.crimson_sky.common.network.packet.AttackRequest;
@@ -64,7 +65,7 @@ class AttackRequestHandlerTest {
         CharacterService characterService = new CharacterService(characterDao);
         return new AttackRequestHandler(
             new AttackService(characterService, new BotFactory(), db.jdbi().onDemand(BattleHistoryDao.class)),
-            new RewardService(db.jdbi(), characterService));
+            new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class)));
     }
 
     @Test
@@ -72,7 +73,7 @@ class AttackRequestHandlerTest {
         seedRewardTables();
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        handler().handle(connection, new AttackRequest(CHARACTER_A));
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.NORMAL));
 
         AttackResponse response = connection.onlySentPacket(AttackResponse.class);
         assertNotNull(response.opponentDisplayName());
@@ -84,7 +85,7 @@ class AttackRequestHandlerTest {
         seedRewardTables();
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        handler().handle(connection, new AttackRequest(CHARACTER_A));
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.NORMAL));
 
         AttackResponse response = connection.onlySentPacket(AttackResponse.class);
         assertTrue(response.goldDelta() > 0, "every battle pays something, win or lose");
@@ -100,7 +101,7 @@ class AttackRequestHandlerTest {
         // No rows seeded: the reward transaction's history insert violates its foreign key and rolls back.
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        handler().handle(connection, new AttackRequest(CHARACTER_A));
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.NORMAL));
 
         AttackResponse response = connection.onlySentPacket(AttackResponse.class);
         assertTrue(response.turns().size > 0, "the fight already happened — the player still gets to see it");
@@ -118,7 +119,7 @@ class AttackRequestHandlerTest {
         }
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        handler().handle(connection, new AttackRequest(CHARACTER_A));
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.NORMAL));
 
         AttackRejectedResponse response = connection.onlySentPacket(AttackRejectedResponse.class);
         assertEquals(MessageCode.DAILY_BATTLE_CAP_REACHED.name(), response.reason());
@@ -126,11 +127,37 @@ class AttackRequestHandlerTest {
     }
 
     @Test
+    void rejectsARankedAttackFromASubLevel25Character() {
+        // The fixture characters are level 1 — well under §21's gate. The rejection must arrive before
+        // any battle resolves or pays.
+        seedRewardTables();
+        FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
+
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.RANKED));
+
+        AttackRejectedResponse response = connection.onlySentPacket(AttackRejectedResponse.class);
+        assertEquals(MessageCode.RANKED_LEVEL_GATE_NOT_MET.name(), response.reason());
+        assertEquals(0, db.battleHistoryRowCount(), "a gated ranked attack resolves no battle and records nothing");
+    }
+
+    @Test
+    void resolvesARankedBattleForALevel25Character() {
+        seedRewardTables();
+        characterDao.with(CombatFixtures.characterAtLevel(CHARACTER_A, ACCOUNT_A, "Ayla", 25, 0L), ACCOUNT_A, 1000);
+        FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
+
+        handler().handle(connection, new AttackRequest(CHARACTER_A, BattleMode.RANKED));
+
+        AttackResponse response = connection.onlySentPacket(AttackResponse.class);
+        assertTrue(response.turns().size > 0, "a gate-passing ranked attack resolves like any other battle");
+    }
+
+    @Test
     void rejectsUnauthenticatedConnection() {
         seedRewardTables();
         FakeGameConnection anonymous = FakeGameConnection.unauthenticated(9);
 
-        handler().handle(anonymous, new AttackRequest(CHARACTER_A));
+        handler().handle(anonymous, new AttackRequest(CHARACTER_A, BattleMode.NORMAL));
 
         assertTrue(anonymous.sentNothing(), "an unauthenticated request is dropped, never resolved");
     }
@@ -140,7 +167,7 @@ class AttackRequestHandlerTest {
         seedRewardTables();
         FakeGameConnection connection = FakeGameConnection.authenticated(1, ACCOUNT_A);
 
-        handler().handle(connection, new AttackRequest(CHARACTER_B)); // belongs to account B
+        handler().handle(connection, new AttackRequest(CHARACTER_B, BattleMode.NORMAL)); // belongs to account B
 
         assertTrue(connection.sentNothing(), "a non-owned character can never be sent into battle");
         assertEquals(0, db.battleHistoryRowCount(), "a rejected attack pays nothing and records nothing");

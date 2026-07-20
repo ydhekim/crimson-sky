@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.common.model.Tameness;
@@ -91,14 +92,14 @@ class BattleLeavesInventoryAloneTest {
 
         CharacterService characterService = new CharacterService(characterDao);
         attackService = new AttackService(characterService, new BotFactory(new Random(42L)), db.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
-        rewardService = new RewardService(db.jdbi(), characterService);
+        rewardService = new RewardService(db.jdbi(), characterService, db.jdbi().onDemand(BattleHistoryDao.class));
     }
 
     @Test
     void aFullAttackAndItsRewardNeverTakeAStoredItemAway() {
         String loadoutBefore = db.loadoutJsonOf(ATTACKER);
 
-        Optional<AttackResult> result = attackService.attack(ATTACKER);
+        Optional<AttackResult> result = attackService.attack(ATTACKER, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         RewardOutcome outcome = rewardService.applyRewards(result.get());
 
@@ -126,7 +127,7 @@ class BattleLeavesInventoryAloneTest {
         // The positive half of the rule this test narrowed for (§17): the battle's *one* sanctioned write
         // to `inventory` is a fired weapon's durability, and it commits with the rest of the reward.
         // CombatFixtures.character always draws its weapon (STR 100), so id 1 fires every battle.
-        Optional<AttackResult> result = attackService.attack(ATTACKER);
+        Optional<AttackResult> result = attackService.attack(ATTACKER, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         rewardService.applyRewards(result.get());
 
@@ -161,10 +162,11 @@ class BattleLeavesInventoryAloneTest {
         CharacterService characterService = new CharacterService(dao);
         AttackService shopAttack = new AttackService(
             characterService, new BotFactory(new Random(42L)), shopDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
-        RewardService shopReward = new RewardService(shopDb.jdbi(), characterService);
+        RewardService shopReward = new RewardService(shopDb.jdbi(), characterService,
+            shopDb.jdbi().onDemand(BattleHistoryDao.class));
         ShopService shopService = new ShopService(shopDb.jdbi(), characterService);
 
-        Optional<AttackResult> result = shopAttack.attack(ATTACKER);
+        Optional<AttackResult> result = shopAttack.attack(ATTACKER, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         shopReward.applyRewards(result.get());
         assertTrue(shopDb.inventoryJsonOf(ATTACKER).contains("\"currentHealth\":39"),
@@ -201,11 +203,13 @@ class BattleLeavesInventoryAloneTest {
             .withAccount(ACCOUNT_A, 0L).withAccount(ACCOUNT_B, 0L)
             .withCharacter(ATTACKER, ACCOUNT_A, "Ayla", 0L, 1000, inventory, inventory)
             .withCharacter(OPPONENT, ACCOUNT_B, "Boran", 0L, 1000, inventory, inventory);
-        RewardService potionReward = new RewardService(potionDb.jdbi(), new CharacterService(dao));
+        RewardService potionReward = new RewardService(potionDb.jdbi(), new CharacterService(dao),
+            potionDb.jdbi().onDemand(BattleHistoryDao.class));
 
         potionReward.applyRewards(new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true,
             Array.with(Array.with(
-                new ResolvedAction(ActionSource.CONSUMABLE, "Small Health Potion", 1, false, 100, 100L)))));
+                new ResolvedAction(ActionSource.CONSUMABLE, "Small Health Potion", 1, false, 100, 100L))),
+            BattleMode.NORMAL));
 
         String after = potionDb.inventoryJsonOf(ATTACKER);
         assertTrue(after.contains("\"charges\":2"), "the drunk potion's charge landed: 3 → 2 (§18)");
@@ -297,9 +301,10 @@ class BattleLeavesInventoryAloneTest {
 
         CharacterService characterService = new CharacterService(dao);
         AttackService bonusAttack = new AttackService(characterService, new BotFactory(new Random(42L)), bonusDb.jdbi().onDemand(BattleHistoryDao.class), new Random(42L));
-        RewardService bonusReward = new RewardService(bonusDb.jdbi(), characterService, alwaysRollsBonus());
+        RewardService bonusReward = new RewardService(bonusDb.jdbi(), characterService,
+            bonusDb.jdbi().onDemand(BattleHistoryDao.class), alwaysRollsBonus());
 
-        Optional<AttackResult> result = bonusAttack.attack(attacker);
+        Optional<AttackResult> result = bonusAttack.attack(attacker, BattleMode.NORMAL);
         assertTrue(result.isPresent(), "precondition: the battle resolves");
         RewardOutcome outcome = bonusReward.applyRewards(result.get());
 

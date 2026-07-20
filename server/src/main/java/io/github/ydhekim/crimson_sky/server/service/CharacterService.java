@@ -79,6 +79,30 @@ public class CharacterService {
         }
     }
 
+    /**
+     * Ranked opponent candidates (system design §21): level-25+ characters whose live-computed ranked Elo
+     * falls within {@code ±eloRange} of {@code elo}, excluding the requester itself.
+     */
+    public ServiceResult<List<Character>> findRankedOpponentCandidates(long characterId, int elo, int eloRange) {
+        try {
+            return toCharacters(characterDao.findRankedOpponentCandidatesInEloRange(
+                characterId, elo - eloRange, elo + eloRange));
+        } catch (Exception e) {
+            log.error("Ranked opponent candidate lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
+    /** The unbounded ranked widening step (system design §21): any level-25+ character but the requester. */
+    public ServiceResult<List<Character>> findAllRankedOpponentCandidates(long characterId) {
+        try {
+            return toCharacters(characterDao.findAllRankedOpponentCandidates(characterId));
+        } catch (Exception e) {
+            log.error("Unbounded ranked opponent candidate lookup failed for character ID: " + characterId, e);
+            return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
+        }
+    }
+
     private ServiceResult<List<Character>> toCharacters(List<CharacterEntity> entities) {
         return ServiceResult.success(MessageCode.SUCCESS, entities.stream()
             .map(CharacterEntity::toCommonModel)

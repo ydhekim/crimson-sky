@@ -59,6 +59,9 @@ public final class TestDatabase {
             handle.execute("CREATE TABLE accounts ("
                 + "id INTEGER PRIMARY KEY, "
                 + "global_currency BIGINT NOT NULL DEFAULT 0)");
+            // The trailing defaulted columns exist for CharacterDao's SELECT-*-mapped ranked candidate
+            // queries (system design §21): the constructor mapper needs every CharacterEntity component
+            // present, even though no reward-path test reads them.
             handle.execute("CREATE TABLE characters ("
                 + "id INTEGER PRIMARY KEY, "
                 + "account_id INTEGER NOT NULL REFERENCES accounts (id), "
@@ -66,6 +69,12 @@ public final class TestDatabase {
                 + "level INTEGER NOT NULL DEFAULT 1, "
                 + "experience BIGINT NOT NULL DEFAULT 0, "
                 + "elo INTEGER NOT NULL DEFAULT 1000, "
+                + "faction VARCHAR(10) NOT NULL DEFAULT 'A', "
+                + "max_hp INTEGER NOT NULL DEFAULT 500, "
+                + "max_mp INTEGER NOT NULL DEFAULT 100, "
+                + "max_stamina INTEGER NOT NULL DEFAULT 100, "
+                + "base_def INTEGER NOT NULL DEFAULT 0, "
+                + "base_atk INTEGER NOT NULL DEFAULT 0, "
                 + "unspent_stat_points INTEGER NOT NULL DEFAULT 0, "
                 + "skill_points INTEGER NOT NULL DEFAULT 0, "
                 + "stats VARCHAR(2000), "
@@ -81,6 +90,8 @@ public final class TestDatabase {
                 + "gold_delta INTEGER NOT NULL, "
                 + "experience_delta BIGINT NOT NULL, "
                 + "elo_delta INTEGER NOT NULL, "
+                + "battle_mode VARCHAR(16) NOT NULL DEFAULT 'NORMAL', "
+                + "ranked_elo_delta INTEGER, "
                 + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)");
             // Quest claim ledger (Epic P / system design §19, V11). The real UNIQUE triple is modelled so a
             // second daily/weekly claim of the same period collides exactly as it would in production.
@@ -184,10 +195,12 @@ public final class TestDatabase {
     public BattleHistoryRow onlyBattleHistoryRow() {
         return jdbi.withHandle(handle -> handle
             .select("SELECT character_id, opponent_character_id, opponent_is_bot, won, gold_delta, "
-                + "experience_delta, elo_delta FROM battle_history")
+                + "experience_delta, elo_delta, battle_mode, ranked_elo_delta FROM battle_history")
             .map((rs, ctx) -> {
                 long opponentId = rs.getLong("opponent_character_id");
                 boolean opponentWasNull = rs.wasNull(); // must be read before any other column is
+                int rankedEloDelta = rs.getInt("ranked_elo_delta");
+                boolean rankedWasNull = rs.wasNull();
                 return new BattleHistoryRow(
                     rs.getLong("character_id"),
                     opponentWasNull ? null : opponentId,
@@ -195,7 +208,9 @@ public final class TestDatabase {
                     rs.getBoolean("won"),
                     rs.getInt("gold_delta"),
                     rs.getLong("experience_delta"),
-                    rs.getInt("elo_delta"));
+                    rs.getInt("elo_delta"),
+                    rs.getString("battle_mode"),
+                    rankedWasNull ? null : rankedEloDelta);
             })
             .one());
     }
@@ -211,6 +226,20 @@ public final class TestDatabase {
             "INSERT INTO battle_history (character_id, opponent_is_bot, won, gold_delta, experience_delta, "
                 + "elo_delta, created_at) VALUES (?, TRUE, ?, 0, 0, 0, ?)",
             characterId, won, Timestamp.from(createdAt)));
+        return this;
+    }
+
+    /**
+     * Seeds one RANKED {@code battle_history} row (system design §21), giving a character's live-computed
+     * ranked Elo a known {@code ranked_elo_delta} contribution. Bound as a won bot fight with zero normal
+     * deltas — only {@code battle_mode}, {@code ranked_elo_delta} and {@code created_at} matter to the
+     * ranked-Elo sum.
+     */
+    public TestDatabase withRankedBattleHistory(long characterId, int rankedEloDelta, Instant createdAt) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO battle_history (character_id, opponent_is_bot, won, gold_delta, experience_delta, "
+                + "elo_delta, battle_mode, ranked_elo_delta, created_at) VALUES (?, TRUE, TRUE, 0, 0, 0, 'RANKED', ?, ?)",
+            characterId, rankedEloDelta, Timestamp.from(createdAt)));
         return this;
     }
 
@@ -250,8 +279,12 @@ public final class TestDatabase {
         });
     }
 
-    /** {@code opponentCharacterId} is {@code null} exactly for a bot fight, mirroring the real column. */
+    /**
+     * {@code opponentCharacterId} is {@code null} exactly for a bot fight, mirroring the real column;
+     * {@code rankedEloDelta} is {@code null} exactly for a NORMAL battle (system design §21).
+     */
     public record BattleHistoryRow(long characterId, Long opponentCharacterId, boolean opponentIsBot,
-                                   boolean won, int goldDelta, long experienceDelta, int eloDelta) {
+                                   boolean won, int goldDelta, long experienceDelta, int eloDelta,
+                                   String battleMode, Integer rankedEloDelta) {
     }
 }

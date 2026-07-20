@@ -37,5 +37,8 @@ public enum MessageCode {
     QUEST_INVALID_REWARD_CHOICE,
 
     // Account levers (system design §20)
-    DAILY_BATTLE_CAP_REACHED
+    DAILY_BATTLE_CAP_REACHED,
+
+    // Ranked ladder (system design §21)
+    RANKED_LEVEL_GATE_NOT_MET
 }

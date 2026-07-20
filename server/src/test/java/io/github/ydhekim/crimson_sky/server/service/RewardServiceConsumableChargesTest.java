@@ -2,6 +2,7 @@ package io.github.ydhekim.crimson_sky.server.service;
 
 import com.badlogic.gdx.utils.Array;
 import io.github.ydhekim.crimson_sky.common.model.ActionSource;
+import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
 import io.github.ydhekim.crimson_sky.server.combat.AttackResult;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class RewardServiceConsumableChargesTest {
     }
 
     private static AttackResult resultWithTurns(Array<Array<ResolvedAction>> turns) {
-        return new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, turns);
+        return new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, turns, BattleMode.NORMAL);
     }
 
     @Test
@@ -79,7 +80,7 @@ class RewardServiceConsumableChargesTest {
     @Test
     void aBattleWithNoTurnsAtAllTalliesNothing() {
         assertTrue(RewardService.consumableTriggerCounts(
-            new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, null)).isEmpty(),
+            new AttackResult(1L, ATTACKER, OPPONENT, "Boran", false, true, null, BattleMode.NORMAL)).isEmpty(),
             "a null turn log is empty, not an NPE — the same tolerance its two siblings carry");
     }
 }
