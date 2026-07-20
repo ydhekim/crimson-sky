@@ -92,8 +92,8 @@ public interface CharacterDao {
     @SqlQuery("SELECT EXISTS(SELECT 1 FROM characters WHERE id = :characterId AND account_id = :accountId)")
     boolean isOwnedByAccount(@Bind("accountId") long accountId, @Bind("characterId") long characterId);
 
-    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, max_stamina, base_def, base_atk, stats, inventory, loadout, skill_tree) " +
-        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.maxStamina, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout, :c.skillTree)")
+    @SqlUpdate("INSERT INTO characters (account_id, name, faction, level, experience, max_hp, max_mp, max_stamina, base_def, base_atk, stats, inventory, loadout, skill_tree, appearance) " +
+        "VALUES (:c.accountId, :c.name, :c.faction, :c.level, :c.experience, :c.maxHp, :c.maxMp, :c.maxStamina, :c.baseDef, :c.baseAtk, :c.stats, :c.inventory, :c.loadout, :c.skillTree, :c.appearance)")
     @GetGeneratedKeys("id")
     long createCharacter(@BindMethods("c") CharacterEntity characterEntity);
 
