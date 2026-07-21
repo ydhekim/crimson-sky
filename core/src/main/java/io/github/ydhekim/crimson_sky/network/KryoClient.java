@@ -21,7 +21,7 @@ public class KryoClient implements GameClient {
     private PacketHandlerRegistry handlerRegistry;
 
     public KryoClient() {
-        client = new Client();
+        client = new Client(KryoConfig.WRITE_BUFFER_SIZE, KryoConfig.OBJECT_BUFFER_SIZE);
         KryoConfig.register(client.getKryo());
 
         // Add listener for connection events
