@@ -18,6 +18,11 @@ public class SaveAccountSettingsRequestHandler implements RequestHandler<SaveAcc
 
     @Override
     public void handle(GameConnection connection, SaveAccountSettingsRequest request) {
+        if (connection.account == null) {
+            log.info("Rejected save-account-settings request from unauthenticated Connection ID: " + connection.getID());
+            return;
+        }
+
         long accountId = connection.account.id();
 
         var result = accountService.saveAccountSettings(accountId, request.accountSettings());
