@@ -93,7 +93,7 @@ public final class TestDatabase {
             handle.execute("CREATE TABLE battle_history ("
                 + "id SERIAL PRIMARY KEY, "
                 + "character_id INTEGER NOT NULL REFERENCES characters (id), "
-                + "opponent_character_id INTEGER REFERENCES characters (id), "
+                + "opponent_character_id INTEGER REFERENCES characters (id) ON DELETE SET NULL, "
                 + "opponent_is_bot BOOLEAN NOT NULL DEFAULT FALSE, "
                 + "won BOOLEAN NOT NULL DEFAULT FALSE, "
                 + "gold_delta INTEGER NOT NULL, "

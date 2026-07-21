@@ -63,7 +63,7 @@ public class UserService {
 
             return ServiceResult.success(MessageCode.SUCCESS, account);
         } catch (Exception e) {
-            log.error("Exception occurred during login for platform " + platformType + " with token " + identityToken, e);
+            log.error("Exception occurred during login for platform " + platformType, e);
             return ServiceResult.failure(MessageCode.ERROR_UNKNOWN);
         }
     }
