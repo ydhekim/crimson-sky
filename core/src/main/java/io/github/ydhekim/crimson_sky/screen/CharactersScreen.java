@@ -18,6 +18,7 @@ import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
 import io.github.ydhekim.crimson_sky.ui.CharacterRowBuilder;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
+import io.github.ydhekim.crimson_sky.ui.UiMetrics;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
 
 public class CharactersScreen extends BaseScreen implements NetworkListener {
@@ -66,7 +67,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         footerTable = new VisTable();
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_BACK"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(() -> screenRouter.navigateTo(ScreenType.MAIN_MENU))
             .buildAndAddTo(footerTable);
 
@@ -74,10 +75,10 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         createCharacterButton = new UIButtonBuilder("New Character")
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToCharacterCreation)
             .build();
-        footerTable.add(createCharacterButton).width(200).height(40).right();
+        footerTable.add(createCharacterButton).width(UiMetrics.NAV_BUTTON_WIDTH).height(UiMetrics.NAV_BUTTON_HEIGHT).right();
 
         mainPanel.add(footerTable).expandX().fillX();
 
@@ -148,7 +149,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         new UIButtonBuilder("Yes")
             .withStyle(customButtonStyle)
-            .withSize(96, 32)
+            .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(() -> {
                 dialog.hide();
                 game.getNetworkClient().sendTCP(new DeleteCharacterRequest(character.name()));
@@ -158,7 +159,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         new UIButtonBuilder("No")
             .withStyle(customButtonStyle)
-            .withSize(96, 32)
+            .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(dialog::hide)
             .buildAndAddTo(dialog.getButtonsTable());
 
@@ -207,26 +208,16 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
     @Override
     public void onLocalizationResponse(LocalizationResponse response) {
-        Gdx.app.log("CharactersScreen", "Response alındı! Başarı: " + response.success());
-
         if (response.success() && response.translations() != null) {
-            Gdx.app.log("CharactersScreen", "Gelen veri boyutu: " + response.translations().size());
-
-            // Gelen verileri tek tek logla (Hangi anahtarlar gelmiş görelim)
-            response.translations().forEach((key, value) ->
-                Gdx.app.log("CharactersScreen", "Key: " + key + " | Value: " + value));
-
+            Gdx.app.log("CharactersScreen", "Localization applied: " + response.translations().size() + " keys.");
             Gdx.app.postRunnable(() -> {
-                // 1. Veriyi menajere işle
                 game.getLanguageManager().setTranslations(response.translations());
-
-                // 2. KRİTİK NOKTA: Ekranı taze dille baştan yarat
-                // setupUI() sadece metni değiştirmez, yeni objeler oluşturur.
-                // O yüzden en temizi ekranı setScreen ile yenilemektir.
+                // Rebuild the screen so every widget is constructed with the new language; setupUI()
+                // creates fresh actors rather than mutating existing text in place.
                 game.setScreen(new CharactersScreen(game));
             });
         } else {
-            Gdx.app.error("CharactersScreen", "Veri boş veya başarısız!");
+            Gdx.app.error("CharactersScreen", "Localization response was empty or unsuccessful.");
         }
     }
 

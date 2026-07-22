@@ -7,6 +7,7 @@ import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
+import io.github.ydhekim.crimson_sky.ui.UiMetrics;
 
 /**
  * Main menu screen with navigation options.
@@ -44,28 +45,28 @@ public class MainMenuScreen extends BaseScreen {
         // Build buttons using UIButtonBuilder + Command Pattern
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_CHARACTERS"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToCharacters)
             .buildAndAddTo(buttonTable, 15);
         buttonTable.row();
 
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_ACHIEVEMENTS"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToAchievements)
             .buildAndAddTo(buttonTable, 15);
         buttonTable.row();
 
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_SETTINGS"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToSettings)
             .buildAndAddTo(buttonTable, 15);
         buttonTable.row();
 
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_EXIT"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(Gdx.app::exit)
             .buildAndAddTo(buttonTable);
 

@@ -18,6 +18,7 @@ import io.github.ydhekim.crimson_sky.common.model.Loadout;
 import io.github.ydhekim.crimson_sky.common.model.Stats;
 import io.github.ydhekim.crimson_sky.common.network.packet.CreateCharacterRequest;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
+import io.github.ydhekim.crimson_sky.ui.UiMetrics;
 
 import java.util.HashMap;
 import java.util.List;
@@ -101,7 +102,7 @@ public class CharacterCreationScreen extends BaseScreen {
         // Use UIButtonBuilder with Command Pattern for faction selection
         TextButton factionAButton = new UIButtonBuilder("Faction A")
             .withStyle(customButtonStyle)
-            .withSize(150, 40)
+            .withSize(UiMetrics.FACTION_BUTTON_WIDTH, UiMetrics.FACTION_BUTTON_HEIGHT)
             .withAction(() -> {
                 selectedFaction = Faction.A;
                 factionDescriptionLabel.setText("Description for Faction A. This faction focuses on might and raw power.");
@@ -110,7 +111,7 @@ public class CharacterCreationScreen extends BaseScreen {
 
         TextButton factionBButton = new UIButtonBuilder("Faction B")
             .withStyle(customButtonStyle)
-            .withSize(150, 40)
+            .withSize(UiMetrics.FACTION_BUTTON_WIDTH, UiMetrics.FACTION_BUTTON_HEIGHT)
             .withAction(() -> {
                 selectedFaction = Faction.B;
                 factionDescriptionLabel.setText("Description for Faction B. This faction is known for its cunning and arcane knowledge.");
@@ -147,7 +148,7 @@ public class CharacterCreationScreen extends BaseScreen {
         for (String option : options) {
             new UIButtonBuilder(option)
                 .withStyle(customButtonStyle)
-                .withSize(90, 30)
+                .withSize(UiMetrics.SMALL_BUTTON_WIDTH, UiMetrics.SMALL_BUTTON_HEIGHT)
                 .withAction(() -> onSelect.accept(option))
                 .buildAndAddTo(rowTable);
         }
@@ -189,7 +190,9 @@ public class CharacterCreationScreen extends BaseScreen {
         new Tooltip.Builder(description).target(infoButton).build();
         rowTable.add(infoButton).padRight(5);
 
-        VisProgressBar progressBar = new VisProgressBar(0, Stats.MAX_STAT_VALUE, 1, false, "stat-bar");
+        // Uses VisUI's bundled default progress-bar style; the custom "stat-bar" style was removed with
+        // uiskin.json in the M4 foundation cleanup (prompt 24). Real stat-bar art is later content work.
+        VisProgressBar progressBar = new VisProgressBar(0, Stats.MAX_STAT_VALUE, 1, false);
         progressBar.setValue(stats.get(name));
         statProgressBars.put(name, progressBar);
         rowTable.add(progressBar).expandX().fillX().padRight(10);
@@ -201,13 +204,13 @@ public class CharacterCreationScreen extends BaseScreen {
         // Use UIButtonBuilder for stat adjustment buttons
         TextButton minusButton = new UIButtonBuilder("-")
             .withStyle(squareButtonStyle)
-            .withSize(16, 16)
+            .withSize(UiMetrics.ICON_BUTTON_SIZE, UiMetrics.ICON_BUTTON_SIZE)
             .withAction(() -> adjustStat(name, -1))
             .build();
 
         TextButton plusButton = new UIButtonBuilder("+")
             .withStyle(squareButtonStyle)
-            .withSize(16, 16)
+            .withSize(UiMetrics.ICON_BUTTON_SIZE, UiMetrics.ICON_BUTTON_SIZE)
             .withAction(() -> adjustStat(name, 1))
             .build();
 
@@ -222,7 +225,7 @@ public class CharacterCreationScreen extends BaseScreen {
 
         new UIButtonBuilder("Back")
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(() -> game.getScreenRouter().navigateTo(ScreenType.CHARACTERS))
             .buildAndAddTo(footerTable);
 
@@ -230,7 +233,7 @@ public class CharacterCreationScreen extends BaseScreen {
 
         new UIButtonBuilder("Create")
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::submitCharacterCreation)
             .buildAndAddTo(footerTable);
 

@@ -2,9 +2,9 @@ package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.ScreenAdapter;
-import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
@@ -18,6 +18,7 @@ import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationResponse;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
+import io.github.ydhekim.crimson_sky.ui.UiTheme;
 
 /**
  * Base class for all screens in the game.
@@ -32,6 +33,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     protected Image backgroundImage;
     protected TextButton.TextButtonStyle customButtonStyle;
     protected TextButton.TextButtonStyle squareButtonStyle;
+    protected UiTheme uiTheme;
 
     protected static final float VIRTUAL_WIDTH = 1280f;
     protected static final float VIRTUAL_HEIGHT = 720f;
@@ -70,16 +72,17 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     }
 
     /**
-     * Sets up the custom button style from VisUI skin.
+     * Builds the button styles from {@link UiTheme}'s generated placeholder textures — a standard
+     * nav/dialog style and a smaller icon-square style, each with distinct up/over/down states.
+     * Guarded on {@link VisUI#isLoaded()} because a {@link TextButton.TextButtonStyle} with a null
+     * font can't draw its label; VisUI's bundled skin is where the shared "default-font" lives.
      */
     private void setupButtonStyle() {
+        uiTheme = new UiTheme();
         if (VisUI.isLoaded()) {
-            // Placeholder-phase stand-in: "custom"/"square" styles no longer exist (uiskin.json
-            // removed, see prompt 24). Both point at VisUI's own bundled default style until the
-            // UI foundation refactor (prompt following this one) replaces this with a real theme.
-            TextButton.TextButtonStyle defaultStyle = VisUI.getSkin().get(TextButton.TextButtonStyle.class);
-            customButtonStyle = defaultStyle;
-            squareButtonStyle = defaultStyle;
+            BitmapFont font = VisUI.getSkin().getFont("default-font");
+            customButtonStyle = uiTheme.standardButtonStyle(font);
+            squareButtonStyle = uiTheme.iconButtonStyle(font);
         }
     }
 
@@ -149,6 +152,9 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
         }
         if (panelBackgroundTexture != null) {
             panelBackgroundTexture.dispose();
+        }
+        if (uiTheme != null) {
+            uiTheme.dispose();
         }
     }
 }
