@@ -189,7 +189,9 @@ public class CharacterCreationScreen extends BaseScreen {
         new Tooltip.Builder(description).target(infoButton).build();
         rowTable.add(infoButton).padRight(5);
 
-        VisProgressBar progressBar = new VisProgressBar(0, Stats.MAX_STAT_VALUE, 1, false, "stat-bar");
+        // Uses VisUI's bundled default progress-bar style; the custom "stat-bar" style was removed with
+        // uiskin.json in the M4 foundation cleanup (prompt 24). Real stat-bar art is later content work.
+        VisProgressBar progressBar = new VisProgressBar(0, Stats.MAX_STAT_VALUE, 1, false);
         progressBar.setValue(stats.get(name));
         statProgressBars.put(name, progressBar);
         rowTable.add(progressBar).expandX().fillX().padRight(10);
