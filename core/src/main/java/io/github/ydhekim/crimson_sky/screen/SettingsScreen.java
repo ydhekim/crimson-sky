@@ -13,6 +13,7 @@ import io.github.ydhekim.crimson_sky.common.network.packet.SaveAccountSettingsRe
 import io.github.ydhekim.crimson_sky.common.network.packet.SaveAccountSettingsResponse;
 import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
+import io.github.ydhekim.crimson_sky.ui.UiMetrics;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -107,7 +108,7 @@ public class SettingsScreen extends BaseScreen {
         VisTable footerTable = new VisTable();
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_BACK"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateBack)
             .buildAndAddTo(footerTable);
 
@@ -115,7 +116,7 @@ public class SettingsScreen extends BaseScreen {
 
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_SAVE"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::saveSettings)
             .buildAndAddTo(footerTable);
 

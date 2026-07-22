@@ -75,13 +75,13 @@ public class CharacterRowBuilder {
         Table actionsTable = new Table();
         new UIButtonBuilder("Play")
             .withStyle(buttonStyle)
-            .withSize(96, 32)
+            .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(onPlayAction)
             .buildAndAddTo(actionsTable, 5);
         actionsTable.row();
         new UIButtonBuilder("Delete")
             .withStyle(buttonStyle)
-            .withSize(96, 32)
+            .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(onDeleteAction)
             .buildAndAddTo(actionsTable);
         row.add(actionsTable).right().padLeft(20);

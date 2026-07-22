@@ -19,6 +19,7 @@ import io.github.ydhekim.crimson_sky.common.network.packet.AchievementListRespon
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
+import io.github.ydhekim.crimson_sky.ui.UiMetrics;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +35,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         super(game);
         this.disposables = new ArrayList<>();
 
-        // 1. Ağ dinleyicisini bu ekrana ayarla ve istek at
+        // Register this screen as the network listener before firing the request.
         game.getNetworkClient().setListener(this);
 
         setupUIShell();
@@ -79,7 +80,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         VisTable footerTable = new VisTable();
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_BACK"))
             .withStyle(customButtonStyle)
-            .withSize(200, 40)
+            .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(() -> game.getScreenRouter().navigateTo(ScreenType.MAIN_MENU))
             .buildAndAddTo(footerTable);
         footerTable.add().expandX();
@@ -87,10 +88,10 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
     }
 
     /**
-     * Sunucudan veri geldiğinde listeyi dinamik olarak doldurur
+     * Populates the list dynamically once achievement data arrives from the server.
      */
     private void populateAchievements(List<AccountAchievement> achievements) {
-        scrollTable.clearChildren(); // Eski veriler (varsa) temizlensin
+        scrollTable.clearChildren(); // Clear any previously rendered rows.
 
         if (achievements == null || achievements.isEmpty()) {
             scrollTable.add(new VisLabel(game.getLanguageManager().get("UI_MSG_NO_ACHIEVEMENTS"))).expand().center();
@@ -98,7 +99,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         }
 
         for (AccountAchievement ach : achievements) {
-            // Dil anahtarlarını tercüme ettiriyoruz
+            // Resolve the localization keys into display strings.
             String translatedTitle = game.getLanguageManager().get(ach.titleLocKey());
             String translatedDesc = game.getLanguageManager().get(ach.descLocKey());
 
@@ -113,18 +114,18 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         rowTable.setBackground(background);
         rowTable.pad(10);
 
-        // Icon İşlemleri
+        // Icon
         Image iconImage = new Image(icon);
         if (!isUnlocked) {
-            // UX Dokunuşu: Eğer başarım kilitliyse simgeyi yarı şeffaf ve gri yapıyoruz!
+            // Locked achievements get a dimmed, semi-transparent icon.
             iconImage.setColor(new Color(0.3f, 0.3f, 0.3f, 0.5f));
         }
         rowTable.add(iconImage).size(64, 64).padRight(15).align(Align.left);
 
-        // Metin Alanları
+        // Text fields
         VisTable textTable = new VisTable();
         VisLabel titleLabel = new VisLabel(title);
-        if (!isUnlocked) titleLabel.setColor(Color.GRAY); // Kilitliyse başlık gri olsun
+        if (!isUnlocked) titleLabel.setColor(Color.GRAY); // Grey out the title when locked.
         titleLabel.setAlignment(Align.left);
         textTable.add(titleLabel).growX().row();
 
@@ -140,7 +141,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
 
     @Override
     public void onAchievementListResponse(AchievementListResponse response) {
-        // Ağ thread'inden LibGDX ana render thread'ine güvenli geçiş
+        // Hop from the network thread onto the LibGDX render thread before touching UI state.
         Gdx.app.postRunnable(() -> {
             if (response.success() && response.achievements() != null) {
                 populateAchievements(response.achievements());
@@ -159,7 +160,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
     }
 
     private Color getFactionColor(String keyName) {
-        // Tamamen rastgele yerine başarımın adına göre sabit bir mock renk üretelim ki kırpışma yapmasın
+        // Derive a stable mock color from the name's hash (rather than random) so it doesn't flicker between frames.
         int hash = keyName.hashCode();
         float r = Math.abs((hash & 0xFF0000) >> 16) / 255f;
         float g = Math.abs((hash & 0x00FF00) >> 8) / 255f;
@@ -175,7 +176,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         }
         disposables.clear();
 
-        // Dinleyiciyi temizleyerek hafıza sızıntısını (memory leak) engelliyoruz
+        // Clear the listener to avoid a memory leak.
         game.getNetworkClient().setListener(null);
     }
 }
