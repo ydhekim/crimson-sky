@@ -1,10 +1,8 @@
 package io.github.ydhekim.crimson_sky;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Game;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.kotcrab.vis.ui.VisUI;
 import io.github.ydhekim.crimson_sky.asset.AssetLoader;
 import io.github.ydhekim.crimson_sky.config.ConfigurationManager;
@@ -69,16 +67,13 @@ public class CrimsonSky extends Game {
     private void initializeUI() {
         if (!VisUI.isLoaded()) {
             BitmapFont customFont = assetManager.get("default-font.ttf", BitmapFont.class);
-            TextureAtlas uiAtlas = assetManager.get("demir_avaz_ui_buttons.atlas", TextureAtlas.class);
-            TextureAtlas achievementsAtlas = assetManager.get("achievements/achievements.atlas", TextureAtlas.class);
 
+            // No custom skin/atlases are shipped (M4 foundation cleanup): load VisUI's own bundled
+            // default skin and register only the custom Turkish-capable font onto it as "default-font".
             VisUI.load();
             VisUI.getSkin().add("default-font", customFont, BitmapFont.class);
-            VisUI.getSkin().addRegions(uiAtlas);
-            VisUI.getSkin().addRegions(achievementsAtlas);
-            VisUI.getSkin().load(Gdx.files.internal("uiskin.json"));
 
-            System.out.println("VisUI initialized with custom assets.");
+            System.out.println("VisUI initialized with bundled skin + custom font.");
         }
     }
 

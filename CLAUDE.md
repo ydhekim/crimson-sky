@@ -62,12 +62,14 @@ Ashley **systems** live in `core/ecs/system/*` (`ActionResolutionSystem` is the 
 
 ### Screens & UI (client)
 
-Screens are created through `ScreenFactory` (switch over `ScreenType`) and navigated/cached through `ScreenRouter` (`navigateTo` reuses a cached `Screen` instance per type, `clearScreen` disposes and evicts one). Both are constructed once in `CrimsonSky.create()` and handed to screens via constructor injection — there's no service locator/singleton for these. UI is built with VisUI/Scene2D `Table` layouts against a skin loaded from `uiskin.json`; custom fonts/atlases are registered onto `VisUI.getSkin()` in `CrimsonSky.initializeUI()` before any screen loads.
+Screens are created through `ScreenFactory` (switch over `ScreenType`) and navigated/cached through `ScreenRouter` (`navigateTo` reuses a cached `Screen` instance per type, `clearScreen` disposes and evicts one). Both are constructed once in `CrimsonSky.create()` and handed to screens via constructor injection — there's no service locator/singleton for these. UI is built with VisUI/Scene2D `Table` layouts against VisUI's bundled default skin; the custom Turkish-capable font is registered onto `VisUI.getSkin()` as `default-font` in `CrimsonSky.initializeUI()` before any screen loads (no `uiskin.json` or texture atlases are shipped — see the asset-policy convention below).
 
 ### Conventions to follow (already established in this codebase)
 
 - Manual dependency injection everywhere (constructor injection); no reflection-based DI framework.
 - Networking packets and shared models are Java `record`s, serialized with Kryo's `RecordSerializer`.
 - Prefer `com.badlogic.gdx.utils` collections (`Array`, `ObjectMap`) over `java.util` in LibGDX-facing code (core/server-shared code); plain `java.util` is fine in server-only DB/service code.
-- Fixed-timestep simulation on the server; render-thread delta time is only for interpolation/UI, never simulation logic.
+- Fixed-timestep simulation on the server; render-thread delta time is only for interpolation/UI, never simulation logic. The render loop drains accumulated real time in fixed steps — `while (accumulator >= FIXED_STEP) { engine.update(FIXED_STEP); }` — so the simulation advances deterministically regardless of frame rate.
 - New packet/handler pairs follow the existing Strategy pattern (`RequestHandler<T>` server-side, `Consumer<T>` registration client-side) rather than growing an if/else chain.
+- The client font is a FreeType (`.ttf`) font generated at load with an explicit Turkish character set (`AssetLoader.TURKISH_CHARS`) layered on `FreeTypeFontGenerator.DEFAULT_CHARS`, so glyphs like ğ/ş/ı/İ/ö/ü/ç render correctly.
+- No real art/audio assets exist in the repo yet: all placeholder rendering is code-generated (solid-color `Pixmap`-backed textures via `TextureFactory`, plus VisUI's own bundled skin styles) rather than shipped image/atlas files — the sole exception is one Turkish-capable font, `assets/fonts/Quicksand-Regular.ttf`. Backgrounds, texture atlases, and `uiskin.json` were removed in the M4 foundation cleanup, so don't go looking for them.

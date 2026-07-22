@@ -5,7 +5,6 @@ import com.badlogic.gdx.assets.loaders.FileHandleResolver;
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
-import com.badlogic.gdx.graphics.g2d.TextureAtlas;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGeneratorLoader;
 import com.badlogic.gdx.graphics.g2d.freetype.FreetypeFontLoader;
@@ -43,7 +42,7 @@ public class AssetLoader {
     }
 
     /**
-     * Preloads core game assets (background, UI atlas, font).
+     * Preloads core game assets (currently just the Turkish-capable font).
      * This is a synchronous load; consider creating a loading screen for larger projects.
      */
     private void preloadAssets() {
@@ -55,10 +54,8 @@ public class AssetLoader {
         fontParameter.fontParameters.magFilter = Texture.TextureFilter.Linear;
         fontParameter.fontParameters.characters = FreeTypeFontGenerator.DEFAULT_CHARS + TURKISH_CHARS;
 
-        // Load assets
-        assetManager.load("background.png", Texture.class);
-        assetManager.load("demir_avaz_ui_buttons.atlas", TextureAtlas.class);
-        assetManager.load("achievements/achievements.atlas", TextureAtlas.class);
+        // No image/atlas assets are shipped yet (M4 foundation cleanup) — placeholder visuals are
+        // code-generated via TextureFactory. Only the Turkish-capable FreeType font loads here.
         assetManager.load("default-font.ttf", BitmapFont.class, fontParameter);
 
         // Block until all assets are loaded

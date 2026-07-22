@@ -74,8 +74,12 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
      */
     private void setupButtonStyle() {
         if (VisUI.isLoaded()) {
-            customButtonStyle = VisUI.getSkin().get("custom", TextButton.TextButtonStyle.class);
-            squareButtonStyle = VisUI.getSkin().get("square", TextButton.TextButtonStyle.class);
+            // Placeholder-phase stand-in: "custom"/"square" styles no longer exist (uiskin.json
+            // removed, see prompt 24). Both point at VisUI's own bundled default style until the
+            // UI foundation refactor (prompt following this one) replaces this with a real theme.
+            TextButton.TextButtonStyle defaultStyle = VisUI.getSkin().get(TextButton.TextButtonStyle.class);
+            customButtonStyle = defaultStyle;
+            squareButtonStyle = defaultStyle;
         }
     }
 
