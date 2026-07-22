@@ -20,6 +20,18 @@ import java.util.Map;
  * maintain identical registration order and serializers.
  */
 public class KryoConfig {
+    /**
+     * Per-connection buffer sizes for KryoNet's {@code Client}/{@code Server} constructors.
+     * <p>
+     * {@code OBJECT_BUFFER_SIZE} is the working buffer used to serialize a single outgoing object
+     * and to read a single incoming one, so it must exceed the largest packet on both ends — the
+     * default 2048 was too small for responses like the localization table (~4 KB), which failed
+     * with "Unable to read object larger than read buffer". {@code WRITE_BUFFER_SIZE} is the TCP
+     * send queue and is kept larger so multiple objects can be buffered while one is being flushed.
+     */
+    public static final int WRITE_BUFFER_SIZE = 262144;   // 256 KB
+    public static final int OBJECT_BUFFER_SIZE = 65536;    // 64 KB
+
     public static void register(Kryo kryo) {
         // Register Core Java Classes
         kryo.register(Object.class);

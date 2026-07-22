@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Encodes the three worked scenarios from Mizan_Combat_Engine_GDD_v4.pdf §5 as fixed-seed unit
+ * Encodes the three worked scenarios from the Mizan Combat Engine GDD §5 as fixed-seed unit
  * tests (story A6), plus cascade edge cases. These assert only the <b>character action</b> (A1's
  * {@link ResolvedAction}); the pet column of each scenario (e.g. {@code 2x Wolf}) is story A2 and is
  * intentionally not asserted here.

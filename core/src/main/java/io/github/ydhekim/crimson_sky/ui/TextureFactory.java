@@ -66,5 +66,16 @@ public class TextureFactory {
     public static Texture createRowBackgroundTexture() {
         return createSolidTexture(1, 1, new Color(0.2f, 0.2f, 0.2f, 0.8f));
     }
+
+    /**
+     * Creates a placeholder achievement-icon texture (solid mid-gray).
+     * Stand-in until real per-achievement icon art exists (Epic E).
+     *
+     * @param size dimension (width and height)
+     * @return     Texture object (caller is responsible for disposal)
+     */
+    public static Texture createPlaceholderIconTexture(int size) {
+        return createSolidTexture(size, size, Color.GRAY);
+    }
 }
 

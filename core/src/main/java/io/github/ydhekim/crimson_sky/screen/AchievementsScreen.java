@@ -9,7 +9,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Disposable;
-import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisScrollPane;
 import com.kotcrab.vis.ui.widget.VisTable;
@@ -29,6 +28,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
     private final List<Disposable> disposables;
     private VisTable scrollTable;
     private TextureRegionDrawable rowBgDrawable;
+    private TextureRegion placeholderIconRegion;
 
     public AchievementsScreen(CrimsonSky game) {
         super(game);
@@ -63,6 +63,12 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         disposables.add(rowBgTexture);
         rowBgDrawable = new TextureRegionDrawable(new TextureRegion(rowBgTexture));
 
+        // Placeholder achievement icon — no atlas is shipped (M4 foundation cleanup); real per-achievement
+        // icon art is Epic E content work. One solid-color icon is shared across every row.
+        Texture placeholderIconTexture = TextureFactory.createPlaceholderIconTexture(64);
+        disposables.add(placeholderIconTexture);
+        placeholderIconRegion = new TextureRegion(placeholderIconTexture);
+
         VisScrollPane scrollPane = new VisScrollPane(scrollTable);
         scrollPane.setOverscroll(false, false);
         scrollPane.setFadeScrollBars(false);
@@ -92,24 +98,12 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         }
 
         for (AccountAchievement ach : achievements) {
-            String regionName = ach.iconId();
-            TextureRegion iconRegion = null;
-
-            if (VisUI.isLoaded()) {
-                if (VisUI.getSkin().has(regionName, TextureRegion.class)) {
-                    iconRegion = VisUI.getSkin().getRegion(regionName);
-                } else {
-                    // Fallback: Eğer veritabanındaki ikon atlasta yoksa soru işaretini bas
-                    iconRegion = VisUI.getSkin().getRegion("question_normal");
-                    Gdx.app.log("AchievementsScreen", "İkon atlasta bulunamadı, fallback kullanıldı: " + regionName);
-                }
-            }
-
             // Dil anahtarlarını tercüme ettiriyoruz
             String translatedTitle = game.getLanguageManager().get(ach.titleLocKey());
             String translatedDesc = game.getLanguageManager().get(ach.descLocKey());
 
-            VisTable row = createAchievementRow(iconRegion, translatedTitle, translatedDesc, rowBgDrawable, ach.isUnlocked());
+            VisTable row = createAchievementRow(
+                placeholderIconRegion, translatedTitle, translatedDesc, rowBgDrawable, ach.isUnlocked());
             scrollTable.add(row).growX().padBottom(5).row();
         }
     }

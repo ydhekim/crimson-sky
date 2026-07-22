@@ -20,7 +20,7 @@ public class KryoServer implements GameServer {
     @Override
     public void start(int tcpPort, int udpPort) throws IOException {
         log.info("Initializing KryoServer...");
-        server = new Server() {
+        server = new Server(KryoConfig.WRITE_BUFFER_SIZE, KryoConfig.OBJECT_BUFFER_SIZE) {
             protected Connection newConnection() {
                 return new GameConnection();
             }

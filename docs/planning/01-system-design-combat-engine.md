@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-06 (revised same day: N-participant BattleSession, ownership guardrail, RNG choice, account linking, Steam integration, security hardening)
 
-Source of truth for game rules: `Mizan_Combat_Engine_GDD_v4.pdf`. This document maps those rules onto the existing codebase, following the conventions already established in `CLAUDE.md` (strict ECS for simulation, server-authoritative, manual DI, Strategy-pattern packet routing).
+Source of truth for game rules: this document, originally distilled from the Mizan Combat Engine GDD v4 (the PDF itself is no longer kept in the repo — this doc and its cross-references are self-sufficient). It maps those rules onto the existing codebase, following the conventions already established in `CLAUDE.md` (strict ECS for simulation, server-authoritative, manual DI, Strategy-pattern packet routing).
 
 ## 1. Scope
 

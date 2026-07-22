@@ -4,7 +4,7 @@ Copy everything below the line into Claude Code. Written 2026-07-09 after a Cowo
 
 ---
 
-Implement the next slice of the combat engine for Crimson Sky. Read these first, in order, and treat them as the source of truth — don't re-derive rules from memory or from `Mizan_Combat_Engine_GDD_v4.pdf` alone, the planning docs supersede/extend it:
+Implement the next slice of the combat engine for Crimson Sky. Read these first, in order, and treat them as the source of truth — don't re-derive rules from memory; the planning docs are the spec and supersede/extend the original GDD:
 
 1. `CLAUDE.md` — architecture conventions (ECS discipline, manual DI, Strategy-pattern packets, Kryo registration order, ownership-validation guardrail).
 2. `docs/planning/01-system-design-combat-engine.md` §3, §4.1–§4.4, §6 — the actual spec for everything below.
