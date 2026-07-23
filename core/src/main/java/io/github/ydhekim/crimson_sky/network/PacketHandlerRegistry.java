@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.network;
 
 import com.badlogic.gdx.Gdx;
+import com.esotericsoftware.kryonet.FrameworkMessage;
 import io.github.ydhekim.crimson_sky.common.network.packet.*;
 import io.github.ydhekim.crimson_sky.util.LanguageManager;
 
@@ -68,6 +69,11 @@ public class PacketHandlerRegistry {
         Consumer<Object> handler = handlers.get(packet.getClass());
         if (handler != null) {
             Gdx.app.postRunnable(() -> handler.accept(packet));
+        } else if (packet instanceof FrameworkMessage) {
+            // KeepAlive/Ping/RegisterTCP etc. are KryoNet's own transport framing, never application
+            // packets — they have no handler by design, so warning about them would be pure noise
+            // (a keepalive lands roughly once a second) and would bury genuinely unhandled packets.
+            Gdx.app.debug("PacketHandlerRegistry", "Ignoring framework message: " + packet.getClass().getSimpleName());
         } else {
             Gdx.app.log("PacketHandlerRegistry", "No handler registered for packet type: " + packet.getClass().getSimpleName());
         }

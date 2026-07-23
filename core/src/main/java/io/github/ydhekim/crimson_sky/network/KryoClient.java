@@ -60,6 +60,12 @@ public class KryoClient implements GameClient {
         }
     }
 
+    /**
+     * A cold-connect failure notifies the listener through the same {@code onDisconnected()} the
+     * {@link Listener#disconnected(Connection)} callback above uses, so "couldn't connect at all"
+     * and "connected then dropped" land on the one state screens already handle. Deliberately not a
+     * distinct state/message key — DISCONNECTED's existing copy is close enough for both.
+     */
     @Override
     public void connect(String host, int tcpPort, int udpPort) {
         if (client.isConnected()) return;
@@ -68,6 +74,9 @@ public class KryoClient implements GameClient {
                 client.connect(5000, host, tcpPort, udpPort);
             } catch (IOException e) {
                 Gdx.app.error("KryoClient", "Failed to connect to server: " + e.getMessage(), e);
+                if (listener != null) {
+                    Gdx.app.postRunnable(listener::onDisconnected);
+                }
             }
         }, "KryoClient-Connect").start();
     }
