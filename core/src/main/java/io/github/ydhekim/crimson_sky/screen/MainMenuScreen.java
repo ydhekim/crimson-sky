@@ -8,6 +8,7 @@ import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 import io.github.ydhekim.crimson_sky.ui.UiMetrics;
+import io.github.ydhekim.crimson_sky.ui.UiPalette;
 
 /**
  * Main menu screen with navigation options.
@@ -36,15 +37,16 @@ public class MainMenuScreen extends BaseScreen {
 
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel titleLabel = new VisLabel("MAIN MENU");
+        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_TITLE_MAIN_MENU"));
         titleLabel.setFontScale(2f);
+        titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         mainPanel.add(titleLabel).padBottom(20).row();
 
         Table buttonTable = new Table();
 
         // Build buttons using UIButtonBuilder + Command Pattern
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_CHARACTERS"))
-            .withStyle(customButtonStyle)
+            .withStyle(accentButtonStyle)
             .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToCharacters)
             .buildAndAddTo(buttonTable, 15);
