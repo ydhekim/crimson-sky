@@ -33,6 +33,16 @@ public class UiTheme implements Disposable {
             new Color(0.22f, 0.22f, 0.25f, 1f));
     }
 
+    /**
+     * The primary-CTA style: crimson from {@link UiPalette} rather than inline colors, so any future
+     * "this is the main action" button (an eventual Attack/Play) reaches for this one shared accent
+     * instead of each screen inventing its own.
+     */
+    public TextButton.TextButtonStyle accentButtonStyle(BitmapFont font) {
+        return buildStyle(font, UiPalette.ACCENT_CRIMSON, UiPalette.ACCENT_CRIMSON_HOVER,
+            UiPalette.ACCENT_CRIMSON_PRESSED);
+    }
+
     private TextButton.TextButtonStyle buildStyle(BitmapFont font, Color up, Color over, Color down) {
         TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
         style.font = font;
