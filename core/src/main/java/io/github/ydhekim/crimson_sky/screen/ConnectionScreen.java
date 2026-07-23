@@ -10,7 +10,6 @@ import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
-import com.kotcrab.vis.ui.VisUI;
 import com.kotcrab.vis.ui.widget.VisLabel;
 import com.kotcrab.vis.ui.widget.VisTable;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
@@ -169,7 +168,7 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
 
         // Use UIButtonBuilder with ScreenAction for cleaner button setup
         retryButton = new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_RETRY"))
-            .withStyle(uiTheme.accentButtonStyle(VisUI.getSkin().getFont("default-font")))
+            .withStyle(accentButtonStyle)
             .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::handleRetryButtonClick)
             .build();
