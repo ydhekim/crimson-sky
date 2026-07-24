@@ -5,6 +5,7 @@ import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.kotcrab.vis.ui.VisUI;
 import io.github.ydhekim.crimson_sky.asset.AssetLoader;
+import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.config.ConfigurationManager;
 import io.github.ydhekim.crimson_sky.network.GameClient;
 import io.github.ydhekim.crimson_sky.network.KryoClient;
@@ -23,6 +24,9 @@ public class CrimsonSky extends Game {
     private AssetManager assetManager;
     private LanguageManager languageManager;
     private ScreenRouter screenRouter;
+    // The signed-in account's persisted settings, loaded from the LoginResponse. Defaulted (never null)
+    // so screens reading it before login don't have to null-check.
+    private AccountSettings accountSettings = AccountSettings.createDefault();
 
     public CrimsonSky() {}
 
@@ -91,6 +95,14 @@ public class CrimsonSky extends Game {
 
     public ScreenRouter getScreenRouter() {
         return screenRouter;
+    }
+
+    public AccountSettings getAccountSettings() {
+        return accountSettings;
+    }
+
+    public void setAccountSettings(AccountSettings accountSettings) {
+        this.accountSettings = accountSettings != null ? accountSettings : AccountSettings.createDefault();
     }
 
     @Override

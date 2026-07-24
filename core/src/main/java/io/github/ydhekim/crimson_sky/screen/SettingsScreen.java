@@ -12,8 +12,10 @@ import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.SaveAccountSettingsRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.SaveAccountSettingsResponse;
 import io.github.ydhekim.crimson_sky.screen.factory.ScreenRouter;
+import io.github.ydhekim.crimson_sky.ui.DisplaySettings;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 import io.github.ydhekim.crimson_sky.ui.UiMetrics;
+import io.github.ydhekim.crimson_sky.ui.UiPalette;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,14 +52,15 @@ public class SettingsScreen extends BaseScreen {
 
         VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_SETTINGS"));
         titleLabel.setFontScale(2f);
+        titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         mainPanel.add(titleLabel).padBottom(20).colspan(2).row();
 
         VisTable contentTable = new VisTable();
 
         VisLabel volumeLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_VOLUME"));
         volumeSlider = new VisSlider(0f, 1f, 0.05f, false);
-        volumeSlider.setValue(0.8f);
-        contentTable.add(volumeLabel);
+        volumeSlider.setValue((float) game.getAccountSettings().volumeMaster());
+        contentTable.add(volumeLabel).padRight(20).padBottom(20).left();
         contentTable.add(volumeSlider).width(200).padBottom(20).row();
 
         VisLabel languageLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_LANGUAGE"));
@@ -74,18 +77,15 @@ public class SettingsScreen extends BaseScreen {
                 languageSelectBox.setSelected(name);
             }
         });
-        contentTable.add(languageLabel).padRight(20);
+        contentTable.add(languageLabel).padRight(20).padBottom(20).left();
         contentTable.add(languageSelectBox).width(200).padBottom(20).row();
 
-        VisLabel resolutionLabel = new VisLabel("Resolution:"); // İleride yerelleştirme anahtarı bağlanabilir
+        VisLabel resolutionLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_RESOLUTION"));
         resolutionSelectBox = new VisSelectBox<>();
         resolutionSelectBox.setItems("1280x720", "1600x900", "1920x1080");
+        resolutionSelectBox.setSelected(game.getAccountSettings().resolution());
 
-        // Buraya ağ paketinden veya yerel ayarlardan gelen güncel çözünürlük verisini bağlayabilirsiniz.
-        // Örnek varsayılan kilit:
-        resolutionSelectBox.setSelected("1280x720");
-
-        // Çözünürlük değiştiğinde anında pencereyi boyutlandırmasını sağlayan dinleyici
+        // Applies the selected resolution immediately when it changes.
         resolutionSelectBox.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
@@ -93,13 +93,25 @@ public class SettingsScreen extends BaseScreen {
             }
         });
 
-        contentTable.add(resolutionLabel).padRight(20).left();
+        contentTable.add(resolutionLabel).padRight(20).padBottom(20).left();
         contentTable.add(resolutionSelectBox).width(200).padBottom(20).row();
 
         VisLabel fullscreenLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_FULLSCREEN"));
         fullscreenCheckBox = new VisCheckBox("");
-        fullscreenCheckBox.setChecked(Gdx.graphics.isFullscreen());
-        contentTable.add(fullscreenLabel);
+        // The persisted preference is the label of record, not Gdx.graphics.isFullscreen() — the live
+        // window and the saved value can legitimately disagree right after applyResolution runs async.
+        fullscreenCheckBox.setChecked(game.getAccountSettings().fullscreen());
+
+        // Toggling only the checkbox (without touching resolution) must still take effect immediately,
+        // same as changing the resolution does.
+        fullscreenCheckBox.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                applyResolution(resolutionSelectBox.getSelected(), fullscreenCheckBox.isChecked());
+            }
+        });
+
+        contentTable.add(fullscreenLabel).padRight(20).padBottom(20).left();
         contentTable.add(fullscreenCheckBox).width(200).padBottom(20).row();
 
         mainPanel.add(contentTable).expand().fill().padBottom(40).row();
@@ -115,7 +127,7 @@ public class SettingsScreen extends BaseScreen {
         footerTable.add().expandX();
 
         new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_SAVE"))
-            .withStyle(customButtonStyle)
+            .withStyle(accentButtonStyle)
             .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::saveSettings)
             .buildAndAddTo(footerTable);
@@ -124,22 +136,7 @@ public class SettingsScreen extends BaseScreen {
     }
 
     private void applyResolution(String resolutionStr, boolean isFullscreen) {
-        if (resolutionStr == null || !resolutionStr.contains("x")) return;
-
-        try {
-            String[] parts = resolutionStr.split("x");
-            int width = Integer.parseInt(parts[0]);
-            int height = Integer.parseInt(parts[1]);
-
-            if (isFullscreen) {
-                Gdx.graphics.setFullscreenMode(Gdx.graphics.getDisplayMode());
-            } else {
-                Gdx.graphics.setWindowedMode(width, height);
-            }
-            Gdx.app.log("SettingsScreen", "Pencere boyutu güncellendi: " + resolutionStr + " (Fullscreen: " + isFullscreen + ")");
-        } catch (Exception e) {
-            Gdx.app.error("SettingsScreen", "Çözünürlük uygulanırken hata oluştu", e);
-        }
+        DisplaySettings.apply(resolutionStr, isFullscreen);
     }
 
     private void saveSettings() {
@@ -154,6 +151,11 @@ public class SettingsScreen extends BaseScreen {
             selectedResolution);
 
         game.getLanguageManager().setCurrentLang(selectedLangCode);
+        // Keep the client-side cache (K4) in sync with what was just saved, so a refreshUI() rebuild
+        // reads the new values instead of snapping back to the login-time snapshot. Optimistic — matches
+        // setCurrentLang above; if the save later fails, cache and DB disagree until next login (same
+        // known gap language already has; a rollback path is out of scope for this fix).
+        game.setAccountSettings(accountSettings);
         game.getNetworkClient().sendTCP(new SaveAccountSettingsRequest(accountSettings));
     }
 

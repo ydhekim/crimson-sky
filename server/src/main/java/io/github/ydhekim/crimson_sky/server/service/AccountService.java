@@ -12,9 +12,9 @@ public class AccountService {
     private final AccountDao accountDao;
     private final ObjectMapper objectMapper;
 
-    public AccountService(AccountDao accountDao) {
+    public AccountService(AccountDao accountDao, ObjectMapper objectMapper) {
         this.accountDao = accountDao;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = objectMapper;
     }
 
     public ServiceResult<Void> saveAccountSettings(long accountId, AccountSettings accountSettings) {

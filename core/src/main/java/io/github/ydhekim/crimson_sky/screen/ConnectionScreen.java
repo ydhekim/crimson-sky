@@ -17,7 +17,9 @@ import io.github.ydhekim.crimson_sky.common.model.PlatformType;
 import io.github.ydhekim.crimson_sky.common.network.packet.LocalizationRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.LoginRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.LoginResponse;
+import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.ui.DisplaySettings;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 import io.github.ydhekim.crimson_sky.ui.UiMetrics;
@@ -267,6 +269,15 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
     @Override
     public void onLoginResponse(LoginResponse response) {
         if (response.success()) {
+            // Persisted settings are the source of truth for a returning player. Store them so
+            // SettingsScreen shows real values instead of hardcoded defaults, apply the two with an
+            // immediate visible effect (resolution + fullscreen), and prefer the DB language over
+            // whatever ConfigurationManager set at boot.
+            AccountSettings settings = response.settings() != null ? response.settings() : AccountSettings.createDefault();
+            game.setAccountSettings(settings);
+            DisplaySettings.apply(settings.resolution(), settings.fullscreen());
+            game.getLanguageManager().setCurrentLang(settings.language());
+
             setState(ConnectionState.SUCCESS);
             // Transition to main menu after a short delay (for UX)
             Gdx.app.postRunnable(() -> {
