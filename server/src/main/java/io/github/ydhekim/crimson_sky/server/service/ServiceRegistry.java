@@ -68,7 +68,10 @@ public class ServiceRegistry {
         this.achievementService = new AchievementService(achievementDao);
 
         AccountDao accountDao = dbManager.getJdbi().onDemand(AccountDao.class);
-        this.accountService = new AccountService(accountDao);
+        // Reuse DatabaseManager's fully-configured mapper (ParameterNamesModule et al.) so the record's
+        // @JsonProperty("volume_master") is honoured — a bare `new ObjectMapper()` here is what wrote the
+        // stray `volumeMaster` duplicate key (see V24).
+        this.accountService = new AccountService(accountDao, dbManager.getObjectMapper());
     }
 
     public UserService getUserService() {

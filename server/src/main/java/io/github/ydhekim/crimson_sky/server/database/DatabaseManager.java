@@ -25,6 +25,7 @@ public class DatabaseManager {
     private HikariDataSource dataSource;
     private Flyway flyway;
     private Jdbi jdbi;
+    private ObjectMapper objectMapper;
 
     private DatabaseManager() {
         init();
@@ -69,7 +70,7 @@ public class DatabaseManager {
                 .installPlugin(new Jackson2Plugin())
                 .installPlugin(new PostgresPlugin());
 
-            ObjectMapper objectMapper = new ObjectMapper()
+            this.objectMapper = new ObjectMapper()
                 .registerModule(new Jdk8Module())
                 .registerModule(new JavaTimeModule())
                 .registerModule(new ParameterNamesModule())
@@ -88,6 +89,17 @@ public class DatabaseManager {
 
     public Jdbi getJdbi() {
         return jdbi;
+    }
+
+    /**
+     * The one fully-configured Jackson mapper (Jdk8 + JavaTime + ParameterNames + Gdx modules), the same
+     * instance JDBI uses for {@code @Json} columns. Services that serialize/deserialize model records must
+     * reuse this rather than {@code new ObjectMapper()} — without {@link com.fasterxml.jackson.module.paramnames.ParameterNamesModule}
+     * a record's constructor-parameter {@code @JsonProperty} names are ignored (Jackson falls back to the
+     * accessor name), which is exactly how the stray {@code volumeMaster} key was written (see V24).
+     */
+    public ObjectMapper getObjectMapper() {
+        return objectMapper;
     }
 
     public void close() {

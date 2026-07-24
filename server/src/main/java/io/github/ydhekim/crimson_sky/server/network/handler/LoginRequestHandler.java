@@ -1,6 +1,7 @@
 package io.github.ydhekim.crimson_sky.server.network.handler;
 
 import com.badlogic.gdx.utils.Logger;
+import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.common.model.PlatformType;
 import io.github.ydhekim.crimson_sky.common.network.packet.LoginRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.LoginResponse;
@@ -26,7 +27,7 @@ public class LoginRequestHandler implements RequestHandler<LoginRequest> {
             handleTestLogin(connection, request);
         } else {
             log.info("Rejected login request from Connection ID: " + connection.getID() + ". Platform " + request.platformType() + " not yet supported.");
-            connection.sendTCP(new LoginResponse(false, "Platform " + request.platformType() + " not yet supported.", 0, 0));
+            connection.sendTCP(new LoginResponse(false, "Platform " + request.platformType() + " not yet supported.", 0, 0, AccountSettings.createDefault()));
         }
     }
 
@@ -38,10 +39,11 @@ public class LoginRequestHandler implements RequestHandler<LoginRequest> {
             // CRITICAL: Bind the account to the network session
             connection.account = account;
             log.info("Login successful for Connection ID: " + connection.getID() + ". Bound to Account ID: " + account.id());
-            connection.sendTCP(new LoginResponse(true, "Login successful", account.id(), account.maxSlots()));
+            AccountSettings settings = account.settings() != null ? account.settings() : AccountSettings.createDefault();
+            connection.sendTCP(new LoginResponse(true, "Login successful", account.id(), account.maxSlots(), settings));
         } else {
             log.info("Login failed for Connection ID: " + connection.getID() + ". Reason: " + result.code().name());
-            connection.sendTCP(new LoginResponse(false, result.code().name(), 0, 0));
+            connection.sendTCP(new LoginResponse(false, result.code().name(), 0, 0, AccountSettings.createDefault()));
         }
     }
 }
