@@ -110,13 +110,15 @@ public final class TestDatabase {
                 + "key_name VARCHAR(100) NOT NULL, "
                 + "group_type VARCHAR(30))");
             // Achievement content + unlock ledger (S1/S2, V15; title/desc loc-key FKs added for S3's page join).
-            // Only the columns findAllDefinitions / getAchievementsForCharacterPage read are modelled; icon
-            // (the account read endpoint's) stays omitted since no server test here reads it.
+            // Only the columns findAllDefinitions / getAchievementsForCharacterPage / getAchievementsForAccount
+            // read are modelled — the last of these adds icon_id (the account read endpoint's, exercised by
+            // AchievementDaoAccountOrderTest).
             handle.execute("CREATE TABLE achievement_definitions ("
                 + "id INTEGER PRIMARY KEY, "
                 + "key_name VARCHAR(50) NOT NULL, "
                 + "title_loc_key INTEGER REFERENCES localization_keys (id), "
                 + "desc_loc_key INTEGER REFERENCES localization_keys (id), "
+                + "icon_id VARCHAR(50), "
                 + "scope VARCHAR(16) NOT NULL, "
                 + "criteria_type VARCHAR(30) NOT NULL, "
                 + "criteria_params VARCHAR(2000) NOT NULL DEFAULT '{}', "

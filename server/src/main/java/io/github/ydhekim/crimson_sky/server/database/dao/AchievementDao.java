@@ -31,7 +31,8 @@ public interface AchievementDao {
         "JOIN localization_keys lk_t ON ad.title_loc_key = lk_t.id " +
         "JOIN localization_keys lk_d ON ad.desc_loc_key = lk_d.id " +
         "LEFT JOIN achievement_unlocks au ON ad.id = au.achievement_id AND au.account_id = :accountId " +
-        "  AND au.character_id IS NULL")
+        "  AND au.character_id IS NULL " +
+        "ORDER BY ad.id")
     @RegisterConstructorMapper(AccountAchievement.class)
     List<AccountAchievement> getAchievementsForAccount(@Bind("accountId") long accountId);
 
