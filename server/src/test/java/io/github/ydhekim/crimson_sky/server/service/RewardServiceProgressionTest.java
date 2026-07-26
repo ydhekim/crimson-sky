@@ -1,5 +1,6 @@
 package io.github.ydhekim.crimson_sky.server.service;
 
+import io.github.ydhekim.crimson_sky.common.model.LevelCurve;
 import io.github.ydhekim.crimson_sky.common.model.Weapon;
 import org.junit.jupiter.api.Test;
 
@@ -20,16 +21,16 @@ class RewardServiceProgressionTest {
     @Test
     void expCurveIsAnchoredSoLevelOneNeedsZero() {
         // §0's correction: 8×L² − 8, not a literal 8×L². Verified against §15's own worked numbers.
-        assertEquals(0L, RewardService.expNeededForLevel(1));
-        assertEquals(24L, RewardService.expNeededForLevel(2));
-        assertEquals(64L, RewardService.expNeededForLevel(3));
+        assertEquals(0L, LevelCurve.expNeededForLevel(1));
+        assertEquals(24L, LevelCurve.expNeededForLevel(2));
+        assertEquals(64L, LevelCurve.expNeededForLevel(3));
     }
 
     @Test
     void thresholdIncrementsMatchTheGrowthFormula() {
         // By construction expNeededForLevel(L+1) − expNeededForLevel(L) == 8×(2L+1) — 24 for the first.
-        for (int l = 1; l < RewardService.LEVEL_CAP; l++) {
-            long increment = RewardService.expNeededForLevel(l + 1) - RewardService.expNeededForLevel(l);
+        for (int l = 1; l < LevelCurve.LEVEL_CAP; l++) {
+            long increment = LevelCurve.expNeededForLevel(l + 1) - LevelCurve.expNeededForLevel(l);
             assertEquals(8L * (2L * l + 1), increment, "increment for level " + l + "→" + (l + 1));
         }
     }
@@ -49,8 +50,8 @@ class RewardServiceProgressionTest {
 
     @Test
     void neverAdvancesPastTheLevelCap() {
-        assertEquals(RewardService.LEVEL_CAP, RewardService.levelAfter(RewardService.LEVEL_CAP, Long.MAX_VALUE));
-        assertEquals(RewardService.LEVEL_CAP, RewardService.levelAfter(49, Long.MAX_VALUE),
+        assertEquals(LevelCurve.LEVEL_CAP, RewardService.levelAfter(LevelCurve.LEVEL_CAP, Long.MAX_VALUE));
+        assertEquals(LevelCurve.LEVEL_CAP, RewardService.levelAfter(49, Long.MAX_VALUE),
             "a huge exp delta stops at the cap, not past it");
     }
 
