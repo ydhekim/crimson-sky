@@ -2,8 +2,8 @@ package io.github.ydhekim.crimson_sky.screen;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.kotcrab.vis.ui.widget.VisDialog;
@@ -19,7 +19,7 @@ import io.github.ydhekim.crimson_sky.ui.CharacterRowBuilder;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
 import io.github.ydhekim.crimson_sky.ui.UiMetrics;
-import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.ui.UiPalette;
 
 public class CharactersScreen extends BaseScreen implements NetworkListener {
 
@@ -29,6 +29,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     private int maxCharacterSlots = 3;
 
     private VisTable footerTable;
+    private VisLabel slotsCountLabel;
     private TextButton createCharacterButton;
     private Texture placeholderAvatarTexture;
     private Texture rowBackgroundTexture;
@@ -49,11 +50,23 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
     }
 
     private void setupUI() {
+        // Re-runnable: refreshUI() calls this again on each language change, so clear the stage first
+        // (mirrors AchievementsScreen) — without it every refresh would stack another panel. Textures
+        // are constructor-only, so nothing is leaked by rebuilding the actor tree here.
+        stage.clear();
+
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel titleLabel = new VisLabel("Character Selection");
+        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_CHARACTER_SELECTION"));
         titleLabel.setFontScale(2f);
-        mainPanel.add(titleLabel).padBottom(20).row();
+        titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
+        titleLabel.setAlignment(Align.center);
+        mainPanel.add(titleLabel).padBottom(4).center().row();
+
+        slotsCountLabel = new VisLabel("");
+        slotsCountLabel.setColor(UiPalette.TEXT_MUTED);
+        slotsCountLabel.setAlignment(Align.center);
+        mainPanel.add(slotsCountLabel).padBottom(20).center().row();
 
         charactersListContainer = new Table();
         charactersListContainer.top();
@@ -73,8 +86,8 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         footerTable.add().expandX();
 
-        createCharacterButton = new UIButtonBuilder("New Character")
-            .withStyle(customButtonStyle)
+        createCharacterButton = new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_NEW_CHARACTER"))
+            .withStyle(accentButtonStyle)
             .withSize(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT)
             .withAction(this::navigateToCharacterCreation)
             .build();
@@ -102,8 +115,11 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         this.characters = newCharacters;
         charactersListContainer.clearChildren();
 
+        slotsCountLabel.setText(String.format(
+            game.getLanguageManager().get("UI_LBL_CHARACTER_SLOTS_COUNT"), characters.size, maxCharacterSlots));
+
         if (characters.isEmpty()) {
-            charactersListContainer.add(new VisLabel("No characters found. Create one to begin your journey!")).expand().center();
+            charactersListContainer.add(new VisLabel(game.getLanguageManager().get("UI_MSG_NO_CHARACTERS"))).expand().center();
         } else {
             for (Character character : characters) {
                 Table rowTable = createCharacterRow(character);
@@ -113,21 +129,19 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         boolean canCreate = characters.size < maxCharacterSlots;
         createCharacterButton.setDisabled(!canCreate);
-        if (!canCreate) {
-            createCharacterButton.setText("Slots Full");
-        } else {
-            createCharacterButton.setText("New Character");
-        }
+        createCharacterButton.setText(canCreate
+            ? game.getLanguageManager().get("UI_BTN_NEW_CHARACTER")
+            : game.getLanguageManager().get("UI_LBL_SLOTS_FULL"));
     }
 
     /**
      * Creates character row using CharacterRowBuilder (Builder + Command Pattern).
      */
     private Table createCharacterRow(final Character character) {
-        return new CharacterRowBuilder(character)
+        return new CharacterRowBuilder(game, character)
             .withAvatarTexture(placeholderAvatarTexture)
             .withRowBackgroundTexture(rowBackgroundTexture)
-            .withButtonStyle(customButtonStyle)
+            .withButtonStyles(accentButtonStyle, squareButtonStyle)
             .onPlay(() -> startGame(character))
             .onDelete(() -> confirmDeleteCharacter(character))
             .build();
@@ -137,17 +151,10 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
      * Shows confirmation dialog for character deletion using UIButtonBuilder.
      */
     private void confirmDeleteCharacter(final Character character) {
-        VisDialog dialog = new VisDialog("Delete Character") {
-            @Override
-            protected void result(Object object) {
-                if ((Boolean) object) {
-                    game.getNetworkClient().sendTCP(new DeleteCharacterRequest(character.name()));
-                }
-            }
-        };
-        dialog.text("Are you sure you want to permanently delete " + character.name() + "?");
+        VisDialog dialog = new VisDialog(game.getLanguageManager().get("UI_LBL_DELETE_CHARACTER_TITLE"));
+        dialog.text(String.format(game.getLanguageManager().get("UI_MSG_DELETE_CHARACTER_CONFIRM"), character.name()));
 
-        new UIButtonBuilder("Yes")
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_YES"))
             .withStyle(customButtonStyle)
             .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(() -> {
@@ -157,12 +164,11 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
             .buildAndAddTo(dialog.getButtonsTable());
         dialog.getButtonsTable().add().expandX();
 
-        new UIButtonBuilder("No")
+        new UIButtonBuilder(game.getLanguageManager().get("UI_BTN_NO"))
             .withStyle(customButtonStyle)
             .withSize(UiMetrics.DIALOG_BUTTON_WIDTH, UiMetrics.DIALOG_BUTTON_HEIGHT)
             .withAction(dialog::hide)
             .buildAndAddTo(dialog.getButtonsTable());
-
 
         dialog.show(stage);
     }
@@ -206,19 +212,16 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
         });
     }
 
+    /**
+     * Rebuilds the actor tree with the now-current translations. {@link BaseScreen#onLocalizationResponse}
+     * calls this on each successful {@code LocalizationResponse} (which has already applied the new
+     * translations map centrally). No re-fetch needed — {@code setupUI()}'s final {@code updateList()}
+     * re-renders every row from the already-fetched {@code characters} array; only the localized strings
+     * change, not the data. Textures are constructor-only, so rebuilding here leaks nothing.
+     */
     @Override
-    public void onLocalizationResponse(LocalizationResponse response) {
-        if (response.success() && response.translations() != null) {
-            Gdx.app.log("CharactersScreen", "Localization applied: " + response.translations().size() + " keys.");
-            Gdx.app.postRunnable(() -> {
-                game.getLanguageManager().setTranslations(response.translations());
-                // Rebuild the screen so every widget is constructed with the new language; setupUI()
-                // creates fresh actors rather than mutating existing text in place.
-                game.setScreen(new CharactersScreen(game));
-            });
-        } else {
-            Gdx.app.error("CharactersScreen", "Localization response was empty or unsuccessful.");
-        }
+    public void refreshUI() {
+        setupUI();
     }
 
     @Override

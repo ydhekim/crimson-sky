@@ -6,6 +6,7 @@ import io.github.ydhekim.crimson_sky.common.model.ActionSource;
 import io.github.ydhekim.crimson_sky.common.model.BattleMode;
 import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.Inventory;
+import io.github.ydhekim.crimson_sky.common.model.LevelCurve;
 import io.github.ydhekim.crimson_sky.common.model.Pet;
 import io.github.ydhekim.crimson_sky.common.model.Rarity;
 import io.github.ydhekim.crimson_sky.common.model.ResolvedAction;
@@ -85,9 +86,6 @@ public class RewardService {
 
     /** Stat points granted per level gained (system design §15). */
     static final int STAT_POINTS_PER_LEVEL = 3;
-
-    /** Hard level cap — no character advances past it regardless of exp (system design §15). */
-    static final int LEVEL_CAP = 50;
 
     /** First-pass chance of a bonus reward on crossing each 10/20/30/40/50 milestone (system design §15). */
     static final double BONUS_ROLL_CHANCE = 0.10;
@@ -266,24 +264,15 @@ public class RewardService {
     }
 
     /**
-     * Total cumulative {@code characters.experience} needed to have reached {@code level}. 8×level²
-     * anchored so level 1 needs 0 (not 8) cumulative exp — matches §15's own worked example ("24 exp for
-     * level 1→2"), which a literal reading of its {@code 8×L²} statement wouldn't. By construction the
-     * increment {@code expNeededForLevel(L+1) − expNeededForLevel(L)} equals {@code 8×(2L+1)} (24 for
-     * L=1), the growth formula §15 actually trusts.
-     */
-    static long expNeededForLevel(int level) {
-        return 8L * level * level - 8L;
-    }
-
-    /**
      * The level a character ends at given its new cumulative {@code experience}, looping so a single
      * battle's exp can cross more than one threshold (system design §15). Never advances past
-     * {@link #LEVEL_CAP} regardless of how much exp is banked.
+     * {@link LevelCurve#LEVEL_CAP} regardless of how much exp is banked. The curve itself lives in
+     * {@link LevelCurve} (shared with the client) so the display bar and the actual level-up decision
+     * read the same formula.
      */
     static int levelAfter(int currentLevel, long newExperience) {
         int level = currentLevel;
-        while (level < LEVEL_CAP && newExperience >= expNeededForLevel(level + 1)) {
+        while (level < LevelCurve.LEVEL_CAP && newExperience >= LevelCurve.expNeededForLevel(level + 1)) {
             level++;
         }
         return level;
@@ -303,7 +292,7 @@ public class RewardService {
 
     /** A level is a bonus-roll milestone when it is one of 10/20/30/40/50 (system design §15). */
     static boolean isMilestone(int level) {
-        return level > 0 && level <= LEVEL_CAP && level % 10 == 0;
+        return level > 0 && level <= LevelCurve.LEVEL_CAP && level % 10 == 0;
     }
 
     /**
