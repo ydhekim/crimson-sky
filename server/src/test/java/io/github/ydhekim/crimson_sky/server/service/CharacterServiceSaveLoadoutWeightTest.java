@@ -62,7 +62,7 @@ class CharacterServiceSaveLoadoutWeightTest {
         Inventory inventory = new Inventory(
             Array.with(weapon(1L), weapon(2L), weapon(3L)), Array.with(PACK_MULE), new Array<>(),
             new HashMap<>());
-        Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.A, 5, 0, 100, 100, 100, 0, 0,
+        Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.CRIMSON, 5, 0, 100, 100, 100, 0, 0,
             new Stats(10 /* STR → 30.0 carry budget */, 5, 5, 5, 5, 5, 5, 5), inventory,
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());
         dao.with(c, ACCOUNT, 1000);
@@ -129,7 +129,7 @@ class CharacterServiceSaveLoadoutWeightTest {
         // carry 30 can carry 30.
         Weapon exact = new Weapon(1L, "Exact", "", Rarity.COMMON, 30f, 10, 20, 5, 20, 20);
         dao = new FakeCharacterDao();
-        Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.A, 5, 0, 100, 100, 100, 0, 0,
+        Character c = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.CRIMSON, 5, 0, 100, 100, 100, 0, 0,
             new Stats(10, 5, 5, 5, 5, 5, 5, 5),
             new Inventory(Array.with(exact), new Array<>(), new Array<>(), new java.util.HashMap<>()),
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());

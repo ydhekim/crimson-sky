@@ -75,7 +75,7 @@ public final class TestDatabase {
                 + "level INTEGER NOT NULL DEFAULT 1, "
                 + "experience BIGINT NOT NULL DEFAULT 0, "
                 + "elo INTEGER NOT NULL DEFAULT 1000, "
-                + "faction VARCHAR(10) NOT NULL DEFAULT 'A', "
+                + "faction VARCHAR(10) NOT NULL DEFAULT 'CRIMSON', "
                 + "max_hp INTEGER NOT NULL DEFAULT 500, "
                 + "max_mp INTEGER NOT NULL DEFAULT 100, "
                 + "max_stamina INTEGER NOT NULL DEFAULT 100, "

@@ -77,7 +77,7 @@ class SkillTreeServiceTest {
 
     @Test
     void rejectsAFactionMismatchOnAFactionNode() {
-        // CombatFixtures characters are Faction.A (Crimson); the Skyborn node requires Faction.B.
+        // CombatFixtures characters are Faction.CRIMSON (Crimson); the Skyborn node requires Faction.SKYBORN.
         seed(50, 100, 10_000L, EMPTY_INVENTORY);
         var result = service.learnOrUpgrade(ACCOUNT, CHARACTER, "faction.skyborn.n1");
         assertFalse(result.success());

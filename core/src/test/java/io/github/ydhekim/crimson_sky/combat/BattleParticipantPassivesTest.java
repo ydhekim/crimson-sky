@@ -42,7 +42,7 @@ class BattleParticipantPassivesTest {
     }
 
     private static Character character(Array<Skill> skills) {
-        return new Character(1L, 1L, "Ayla", Faction.A, 1, 0, 100, 100, 100, 0, 0, BASE,
+        return new Character(1L, 1L, "Ayla", Faction.CRIMSON, 1, 0, 100, 100, 100, 0, 0, BASE,
             new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
             new Loadout(new Array<Weapon>(), skills, new Array<Pet>()),
             new HashMap<>());

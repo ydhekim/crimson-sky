@@ -35,7 +35,7 @@ class BattleEngineTest {
 
     private static Character character(String name, int maxHp, int speed, Array<Weapon> weapons) {
         return new Character(
-            0, 0, name, Faction.A, 1, 0,
+            0, 0, name, Faction.CRIMSON, 1, 0,
             maxHp, 100 /* maxMp */, 100 /* maxStamina */, 0 /* baseDef → full damage lands */, 0,
             stats(80 /* STR → weapon draw succeeds */, speed),
             new Inventory(new Array<>(), new Array<>(), new Array<>(), new java.util.HashMap<>()),

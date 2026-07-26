@@ -55,7 +55,7 @@ class BattleParticipantConsumablesTest {
     }
 
     private static Character character(Array<Skill> owned, Array<Skill> equipped) {
-        return new Character(1L, 1L, "Ayla", Faction.A, 1, 0, 100, 100, 100, 0, 0, BASE,
+        return new Character(1L, 1L, "Ayla", Faction.CRIMSON, 1, 0, 100, 100, 100, 0, 0, BASE,
             new Inventory(new Array<>(), owned, new Array<>(), new HashMap<>()),
             new Loadout(new Array<Weapon>(), equipped, new Array<Pet>()),
             new HashMap<>());

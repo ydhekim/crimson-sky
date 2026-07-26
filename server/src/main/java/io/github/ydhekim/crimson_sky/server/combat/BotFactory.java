@@ -91,7 +91,7 @@ public class BotFactory {
             0L /* no persisted id — a bot has no row in `characters` */,
             0L /* no owning account */,
             name,
-            random.nextBoolean() ? Faction.A : Faction.B,
+            random.nextBoolean() ? Faction.CRIMSON : Faction.SKYBORN,
             1, 0,
             maxHp, maxMp, maxStamina, baseDef, baseAtk,
             stats,

@@ -38,7 +38,7 @@ class BattleParticipantDurabilityTest {
 
     /** STR 100 → the weapon-draw gate always passes, so affordability is the only thing left to decide. */
     private static Character character(Array<Weapon> owned, Array<Weapon> equipped) {
-        return new Character(1L, 1L, "Ayla", Faction.A, 1, 0, 100, 100, 100, 0, 0,
+        return new Character(1L, 1L, "Ayla", Faction.CRIMSON, 1, 0, 100, 100, 100, 0, 0,
             new Stats(100, 0, 10, 10, 10, 10, 0, 0),
             new Inventory(owned, new Array<>(), new Array<>(), new HashMap<>()),
             new Loadout(equipped, new Array<Skill>(), new Array<Pet>()),

@@ -46,7 +46,7 @@ class CharacterServiceCreateCharacterTest {
 
     /** A fresh, level-1 character with an empty inventory/loadout — only its name varies across tests. */
     private static Character character(String name) {
-        return new Character(0, 0, name, Faction.A, 1, 0, 100, 100, 100, 10, 10,
+        return new Character(0, 0, name, Faction.CRIMSON, 1, 0, 100, 100, 100, 10, 10,
             new Stats(5, 5, 5, 5, 5, 5, 5, 5),
             new Inventory(null, null, null, new HashMap<>()),
             new Loadout(null, null, null),

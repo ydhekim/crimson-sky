@@ -43,7 +43,7 @@ class CharacterServiceAllocateStatPointsTest {
     }
 
     private void seed(long characterId, long accountId, Stats stats, int unspentStatPoints) {
-        Character c = new Character(characterId, accountId, "Ayla", Faction.A, 5, 0, 100, 100, 100, 10, 10,
+        Character c = new Character(characterId, accountId, "Ayla", Faction.CRIMSON, 5, 0, 100, 100, 100, 10, 10,
             stats, new Inventory(null, null, null, new java.util.HashMap<>()), new Loadout(null, null, null), new java.util.HashMap<>());
         dao.with(c, accountId, 1000, unspentStatPoints);
     }

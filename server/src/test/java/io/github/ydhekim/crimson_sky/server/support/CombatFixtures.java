@@ -54,7 +54,7 @@ public final class CombatFixtures {
     public static Character frailCharacter(long id, long accountId, String name) {
         Stats stats = new Stats(10, 0, 1, 10, 0, 1, 0, 0);
         return new Character(
-            id, accountId, name, Faction.A, 1, 0,
+            id, accountId, name, Faction.CRIMSON, 1, 0,
             1 /* maxHp */, 10 /* maxMp */, 10 /* maxStamina */, 0, 0,
             stats,
             new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
@@ -109,7 +109,7 @@ public final class CombatFixtures {
             0 /* ins → no pet roll matters; loadout has no pet anyway */);
 
         return new Character(
-            id, accountId, name, Faction.A, 1, 0,
+            id, accountId, name, Faction.CRIMSON, 1, 0,
             500 /* maxHp */, 100 /* maxMp */, 100 /* maxStamina */,
             0 /* baseDef → full damage lands */, 0 /* baseAtk */,
             stats,

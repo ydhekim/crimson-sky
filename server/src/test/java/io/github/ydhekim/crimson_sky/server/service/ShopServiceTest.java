@@ -68,7 +68,7 @@ class ShopServiceTest {
     private void seed(long gold, Weapon weapon, Pet pet, Map<String, Integer> consumables) {
         Inventory inventory = new Inventory(Array.with(weapon), new Array<Skill>(), Array.with(pet),
             new HashMap<>(consumables));
-        Character character = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.A, 5, 0L, 100, 100, 100, 0, 0,
+        Character character = new Character(CHARACTER, ACCOUNT, "Ayla", Faction.CRIMSON, 5, 0L, 100, 100, 100, 0, 0,
             new Stats(10, 10, 10, 10, 10, 10, 10, 10), inventory,
             new Loadout(new Array<>(), new Array<>(), new Array<>()), new HashMap<>());
 
