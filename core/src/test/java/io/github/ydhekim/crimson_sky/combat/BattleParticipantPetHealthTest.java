@@ -43,7 +43,7 @@ class BattleParticipantPetHealthTest {
     }
 
     private static Character character(Array<Pet> owned, Array<Pet> equipped) {
-        return new Character(1L, 1L, "Ayla", Faction.A, 1, 0, 100, 100, 100, 0, 0,
+        return new Character(1L, 1L, "Ayla", Faction.CRIMSON, 1, 0, 100, 100, 100, 0, 0,
             HIGH_INSIGHT,
             new Inventory(new Array<>(), new Array<>(), owned, new HashMap<>()),
             new Loadout(new Array<Weapon>(), new Array<Skill>(), equipped),

@@ -24,8 +24,8 @@ import java.util.Map;
  * <p><b>Structure:</b> three level-gated branches (Physical / Magical / Universal), each with tiers at
  * levels 1/20/40 and two nodes per tier (18 nodes); plus a Faction branch — not level-gated, matched to
  * the character's own {@link Faction} — with one node each ({@code faction.crimson.n1} crit,
- * {@code faction.skyborn.n1} dodge). Faction mapping: {@link Faction#A} → Crimson (crit),
- * {@link Faction#B} → Skyborn (dodge), matching the creation screen's placeholder descriptions.
+ * {@code faction.skyborn.n1} dodge). Faction mapping: {@link Faction#CRIMSON} → crit,
+ * {@link Faction#SKYBORN} → dodge, matching the creation screen's faction descriptions.
  *
  * <p><b>Magnitude convention:</b> {@link Node#magnitudePerRank} is the <i>per-rank increment</i>. The
  * granted {@link Skill} from {@link Node#skillAtRank(int)} carries the full, rank-scaled magnitude
@@ -117,9 +117,9 @@ public final class SkillTreeCatalog {
         add(nodes, dodge("universal.t3.n1", 1016L, "Untouchable", 40, 5, T3_SP, T3_GOLD));
         add(nodes, stat("universal.t3.n2", 1017L, "Overdrive", 40, StatName.SPEED, 6, T3_SP, T3_GOLD));
         // Faction branch — not level-gated; gated by faction match instead. Faction cost == tier-2 cost.
-        add(nodes, new Node("faction.crimson.n1", 1018L, "Crimson Fury", 0, Faction.A,
+        add(nodes, new Node("faction.crimson.n1", 1018L, "Crimson Fury", 0, Faction.CRIMSON,
             PassiveEffectType.CRIT_CHANCE_BONUS, null, 5, T2_SP, T2_GOLD));
-        add(nodes, new Node("faction.skyborn.n1", 1019L, "Skyborn Grace", 0, Faction.B,
+        add(nodes, new Node("faction.skyborn.n1", 1019L, "Skyborn Grace", 0, Faction.SKYBORN,
             PassiveEffectType.DODGE_CHANCE_BONUS, null, 5, T2_SP, T2_GOLD));
         return nodes;
     }

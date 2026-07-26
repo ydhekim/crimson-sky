@@ -40,7 +40,7 @@ public class CharacterCreationScreen extends BaseScreen {
     private final ObjectMap<String, VisLabel> statValueLabels = new ObjectMap<>();
 
     private int statPool = INITIAL_STAT_POOL;
-    private Faction selectedFaction = Faction.A;
+    private Faction selectedFaction = Faction.CRIMSON;
 
     // Purely cosmetic (system design §23), defaulting to each curated list's first entry. The lists live in
     // Appearance so the button UI here and the server's validation read one source of truth.
@@ -104,7 +104,7 @@ public class CharacterCreationScreen extends BaseScreen {
             .withStyle(customButtonStyle)
             .withSize(UiMetrics.FACTION_BUTTON_WIDTH, UiMetrics.FACTION_BUTTON_HEIGHT)
             .withAction(() -> {
-                selectedFaction = Faction.A;
+                selectedFaction = Faction.CRIMSON;
                 factionDescriptionLabel.setText("Description for Faction A. This faction focuses on might and raw power.");
             })
             .build();
@@ -113,7 +113,7 @@ public class CharacterCreationScreen extends BaseScreen {
             .withStyle(customButtonStyle)
             .withSize(UiMetrics.FACTION_BUTTON_WIDTH, UiMetrics.FACTION_BUTTON_HEIGHT)
             .withAction(() -> {
-                selectedFaction = Faction.B;
+                selectedFaction = Faction.SKYBORN;
                 factionDescriptionLabel.setText("Description for Faction B. This faction is known for its cunning and arcane knowledge.");
             })
             .build();

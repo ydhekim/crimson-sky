@@ -70,7 +70,7 @@ class BattleEnginePotionTest {
      * same numbers the potion is being measured by.
      */
     private static Character attacker(Array<Skill> potions, Array<Pet> pets) {
-        return new Character(0, 0, "Attacker", Faction.A, 1, 0,
+        return new Character(0, 0, "Attacker", Faction.CRIMSON, 1, 0,
             500 /* maxHp */, 100 /* maxMp */, 100 /* maxStamina */, HARMLESS_AGAINST_DEF, 0,
             attackerStats(),
             // The potions are owned as well as equipped — the only shape a real character can have, and
@@ -94,7 +94,7 @@ class BattleEnginePotionTest {
      * only punch, and {@code baseDef} 0 so the attacker's own hits (and its pet's) land in full.
      */
     private static Character sparringPartner() {
-        return new Character(0, 0, "Defender", Faction.A, 1, 0,
+        return new Character(0, 0, "Defender", Faction.CRIMSON, 1, 0,
             5000 /* maxHp */, 100, 100, 0 /* baseDef → the attacker's hits land in full */, 0,
             new Stats(0, 0, 50, 0, 0, 50, 0, 0),
             new Inventory(new Array<>(), new Array<>(), new Array<>(), new HashMap<>()),
