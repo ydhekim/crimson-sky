@@ -67,7 +67,7 @@ Two opposite answers to the same fear (of an uncertain future) split the world's
 The Sky-Will and the Deep-Law, pushed to their absolute extremes by the two lines above, were about to collide hard enough to unmake the world. The First Powers intervened and froze that collision into a single place outside time: **the Arena** — which is, in-fiction, why the combat system is named the **Mizan** ("Scale"/"Balance") Combat Engine.
 
 - **Embers** — sparks of the original Split, the same stuff people were made of in Age 0 — fall into the Arena from both the Sky and the Deep.
-- **The Crimson Accord** (the Warden's line) must gather Embers to keep the masks' certainty burning. Let the fire die, and their soldiers go blind again.
+- **The Wardens** (the Warden's line) must gather Embers to keep the masks' certainty burning. Let the fire die, and their soldiers go blind again.
 - **The Skyborn** (the Veiled Son's line) must gather Embers to keep the Secret alive and, eventually, unmake the Deep-Law's grip on the world entirely.
 - **The player** is a soul who has picked a side in this endless court: submit to the Accord and choose certainty, or take the Wild Oath and choose the miracle of chance.
 
@@ -75,13 +75,15 @@ The Sky-Will and the Deep-Law, pushed to their absolute extremes by the two line
 
 ## 4. The Two Factions — present-day identity
 
-| | **The Crimson Accord** | **The Skyborn** |
+| | **The Wardens** | **The Skyborn** |
 |---|---|---|
 | Founding figure | The Warden (unnamed lord, keeper of Yavor's Sight) | The Veiled Son (Yavor's avenging child) |
 | Philosophy | Certainty through submission — surrender your will, never miss | Freedom through risk — keep your will, accept you might miss |
 | Symbol | The eyeless mask | Mist and lightning |
 | Feel | Disciplined, ritualistic, absolute | Wild, defiant, unstable |
 | Color identity | Crimson / iron-dark | Sky-blue / storm-grey |
+
+**Naming note (2026-07-27):** the faction was originally drafted as "The Crimson Accord," but that reads as borrowing the game's own title ("Crimson Sky") rather than standing as its own identity — renamed to **The Wardens**, traced directly to the founding-figure title above rather than invented fresh. "The Accord" (the submission ritual itself, §3 Age III) stays as in-fiction terminology for the practice, just not the faction's own display name anymore. The `Faction` enum constant and color-coded content (the "Crimson Fury" skill, `faction.crimson.n1` node key, `UiPalette.ACCENT_CRIMSON`) are unaffected by this rename — those describe the color/theme, not the display name a player sees.
 
 This is also the natural place to hang a faction-vs-faction mechanical identity — see §6.
 
@@ -95,16 +97,16 @@ Per the "My Brute / Pockie Ninja" feel you described, this cosmology is **backgr
 - **In-match text** (action labels, victory/defeat screens, tooltips, loading tips): short, punchy, almost meme-able — closer to a stat-flex than scripture. Examples:
   - Instead of *"The masks have found their true path,"* → **"CRIT — dead on."**
   - Instead of *"Your will slipped from the Deep-Law's grasp,"* → **"DODGED."**
-  - A loading tip can wink at the lore without performing it: *"Crimson never misses on purpose. Sky never stands still on purpose."*
-- Faction names ("Crimson Accord," "Skyborn") are short enough to use directly in UI (faction badges, matchmaking labels) without translation or shortening.
+  - A loading tip can wink at the lore without performing it: *"Wardens never miss on purpose. Sky never stands still on purpose."*
+- Faction names ("The Wardens," "The Skyborn") are short enough to use directly in UI (faction badges, matchmaking labels) without translation or shortening.
 
 ---
 
 ## 6. Open hooks for other systems (not built yet — flagged, not designed here)
 
-- **Faction skills (crit vs. dodge):** you proposed Crimson gets a skill that raises critical chance, Skyborn gets one that raises dodge chance, kept in balance. This maps cleanly onto the existing GDD stat table (STR/INT already governs "high-tier action weight," i.e. crit is a natural extension of that; SPD already governs dodge chance) — thematically it's a near-perfect fit (Crimson = certainty = "when you hit, you hit true"; Skyborn = evasion = "you're half mist, hard to pin down"). Recommend implementing this as **faction-gated `Skill` records** through the existing Loadout/Skill system rather than a new mechanic layer (reuses an existing pattern, per the codebase's own preference for extending rather than inventing). The actual numbers depend on the combat GDD detailing pass (there's currently no defined "critical hit" concept at all in the 3-page GDD) — logged as a forward pointer in `01-system-design-combat-engine.md` §14, not specced here.
+- **Faction skills (crit vs. dodge):** you proposed the Wardens get a skill that raises critical chance, Skyborn gets one that raises dodge chance, kept in balance. This maps cleanly onto the existing GDD stat table (STR/INT already governs "high-tier action weight," i.e. crit is a natural extension of that; SPD already governs dodge chance) — thematically it's a near-perfect fit (Wardens = certainty = "when you hit, you hit true"; Skyborn = evasion = "you're half mist, hard to pin down"). Recommend implementing this as **faction-gated `Skill` records** through the existing Loadout/Skill system rather than a new mechanic layer (reuses an existing pattern, per the codebase's own preference for extending rather than inventing). The actual numbers depend on the combat GDD detailing pass (there's currently no defined "critical hit" concept at all in the 3-page GDD) — logged as a forward pointer in `01-system-design-combat-engine.md` §14, not specced here. (Already resolved 2026-07-15, see §16 — the skills themselves are built and named "Crimson Fury"/"Skyborn Grace," independent of this doc's later faction-display-name rename.)
 - **Embers as an actual match resource:** the lore treats Embers as something both factions must "gather" — worth deciding later whether that's pure flavor for why the Arena exists, or an actual pickup/resource mechanic during a match. Not decided; flagged for whenever content/systems design revisits Epic J-style ideas.
-- **Faction selection UX:** how/when a player picks Crimson vs. Skyborn (character creation? per-character? cosmetic-only vs. gameplay-binding?) isn't decided — depends on the answer to the skills question above. Worth knowing: `Character.faction` already exists in code today (a `Faction` enum, currently just placeholder `A`/`B`), so the scaffolding is further along than this doc alone would suggest — see `01-system-design-combat-engine.md` §14 for the rename flag.
+- **Faction selection UX:** how/when a player picks the Wardens vs. Skyborn (character creation? per-character? cosmetic-only vs. gameplay-binding?) isn't decided — depends on the answer to the skills question above. Worth knowing: `Character.faction` already exists in code today (a `Faction` enum, whose placeholder `A`/`B` constants were renamed to `CRIMSON`/`SKYBORN` on 2026-07-27), so the scaffolding is further along than this doc alone would suggest — see `01-system-design-combat-engine.md` §14 for the rename flag.
 
 ---
 
