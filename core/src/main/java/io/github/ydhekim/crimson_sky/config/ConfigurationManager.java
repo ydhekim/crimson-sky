@@ -74,12 +74,5 @@ public class ConfigurationManager {
     public String getTestIdentityToken() {
         return getProperty("testIdentityToken");
     }
-
-    /**
-     * Gets the language code from configuration.
-     */
-    public String getLangCode() {
-        return getProperty("testLangCode");
-    }
 }
 

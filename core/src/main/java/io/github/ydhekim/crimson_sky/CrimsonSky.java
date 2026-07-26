@@ -56,9 +56,6 @@ public class CrimsonSky extends Game {
 
         // Read test token from configuration
         String testToken = configManager.getTestIdentityToken();
-        String testLangCode = configManager.getLangCode();
-
-        languageManager.setCurrentLang(testLangCode);
 
         // Start with connection screen
         setScreen(new ConnectionScreen(this, testToken));
