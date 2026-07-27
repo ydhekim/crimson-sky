@@ -43,6 +43,29 @@ public class UiTheme implements Disposable {
             UiPalette.ACCENT_CRIMSON_PRESSED);
     }
 
+    /**
+     * A toggle style whose {@code checked} state is visually distinct — for option rows (gender, hair
+     * type) where exactly one choice is selected at a time via a
+     * {@link com.badlogic.gdx.scenes.scene2d.ui.ButtonGroup}. Unlike standardButtonStyle/accentButtonStyle,
+     * this one defines {@code checked}/{@code checkedOver}, since neither of those is ever set otherwise
+     * ({@code Button.ButtonStyle} silently falls back to {@code up} when unset, which is why toggling
+     * {@code setChecked()} on any existing style produces no visible change).
+     * <p>
+     * Gold rather than crimson: this is the generic "this is the current choice" indicator, independent
+     * of faction — crimson stays reserved for the Wardens on the faction cards.
+     */
+    public TextButton.TextButtonStyle toggleButtonStyle(BitmapFont font) {
+        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
+        style.font = font;
+        style.up = drawable(new Color(0.2f, 0.2f, 0.22f, 1f));
+        style.over = drawable(new Color(0.3f, 0.3f, 0.33f, 1f));
+        style.checked = drawable(new Color(UiPalette.ACCENT_GOLD.r, UiPalette.ACCENT_GOLD.g, UiPalette.ACCENT_GOLD.b, 0.22f));
+        style.checkedOver = drawable(new Color(UiPalette.ACCENT_GOLD.r, UiPalette.ACCENT_GOLD.g, UiPalette.ACCENT_GOLD.b, 0.32f));
+        style.fontColor = Color.WHITE;
+        style.checkedFontColor = UiPalette.ACCENT_GOLD;
+        return style;
+    }
+
     private TextButton.TextButtonStyle buildStyle(BitmapFont font, Color up, Color over, Color down) {
         TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
         style.font = font;

@@ -34,6 +34,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
     protected TextButton.TextButtonStyle customButtonStyle;
     protected TextButton.TextButtonStyle squareButtonStyle;
     protected TextButton.TextButtonStyle accentButtonStyle;
+    protected TextButton.TextButtonStyle toggleButtonStyle;
     protected UiTheme uiTheme;
 
     protected static final float VIRTUAL_WIDTH = 1280f;
@@ -74,8 +75,9 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
 
     /**
      * Builds the button styles from {@link UiTheme}'s generated placeholder textures — a standard
-     * nav/dialog style, a smaller icon-square style, and a crimson primary-CTA (accent) style, each
-     * with distinct up/over/down states. Built once here (not per {@code setupUI()} rebuild) so the
+     * nav/dialog style, a smaller icon-square style, a crimson primary-CTA (accent) style and a
+     * one-of-many toggle style, each with distinct up/over/down states. Built once here (not per
+     * {@code setupUI()} rebuild) so the
      * accent style's textures don't accumulate across localization refreshes on cached screens.
      * Guarded on {@link VisUI#isLoaded()} because a {@link TextButton.TextButtonStyle} with a null
      * font can't draw its label; VisUI's bundled skin is where the shared "default-font" lives.
@@ -87,6 +89,7 @@ public abstract class BaseScreen extends ScreenAdapter implements NetworkListene
             customButtonStyle = uiTheme.standardButtonStyle(font);
             squareButtonStyle = uiTheme.iconButtonStyle(font);
             accentButtonStyle = uiTheme.accentButtonStyle(font);
+            toggleButtonStyle = uiTheme.toggleButtonStyle(font);
         }
     }
 

@@ -487,12 +487,20 @@ INSERT INTO localization_values (key_id, lang_code, text_value) VALUES
 
 ## 12. Testing / Definition of Done
 
-1. `gradlew.bat lwjgl3:run`, reach Character Creation — confirm three steps navigate correctly (Next/Back/Create swap appropriately, step dots update, Back on step 1 exits to Characters).
-2. Confirm every option (faction, gender, hair type, hair color, skin color) visibly shows which one is currently selected, and that selecting a different option in the same row correctly un-highlights the previous one.
-3. Confirm the name field shows genuinely empty (grayed placeholder only) until typed into, and that leaving it empty and clicking Next shows the invalid-name dialog instead of silently advancing.
-4. Confirm the faction cards show the right accent (crimson+gold for the Wardens, blue+silver for the Skyborn) only on the selected one.
-5. Confirm the character-preview box appears on the Appearance step, clearly inert.
-6. Switch language, confirm every string on all three steps (including stat names/descriptions and both factions' taglines) updates correctly.
-7. Complete character creation end to end — confirm the created character still has the correct faction/appearance/stats server-side (unchanged request-building logic, just confirm the wizard didn't break the actual submission).
+Claude Code's job stops at automated checks — no manual client-driving:
 
-Definition of done: matches the approved mockups; every option shows real selected-state feedback; the name field uses real placeholder text; faction identity uses "The Wardens"/"The Skyborn" throughout with per-faction color; a preview slot exists on the Appearance step; every string is localized.
+1. `gradlew.bat build` — confirm everything compiles, including the new `CrestFactory` extraction and `ConnectionScreen`'s updated call site.
+2. `gradlew.bat test` — confirm nothing existing broke (no test currently covers `CharacterCreationScreen` itself; not asking for new ones here — this screen's only verification is visual, see below).
+3. Confirm `V29`'s migration applies cleanly and every key inserted into `localization_keys` has both an `en_US` and `tr_TR` row in `localization_values` (a quick `SELECT key_name FROM localization_keys lk WHERE (SELECT COUNT(*) FROM localization_values lv WHERE lv.key_id = lk.id) < 2 AND lk.key_name LIKE 'UI_%CREATE_CHARACTER%' OR lk.key_name IN (...)` or similar — the point is catching a key with a missing translation row, not eyeballing the SQL by hand).
+
+Manual verification — I'll test the UI myself after this merges, not delegating it to Claude Code (driving the client through Gradle for visual checks is slow for what it buys):
+
+- Three steps navigate correctly (Next/Back/Create swap appropriately, step dots update, Back on step 1 exits to Characters).
+- Every option (faction, gender, hair type, hair color, skin color) visibly shows which one is selected, and picking a different one un-highlights the previous choice.
+- The name field shows genuinely empty (grayed placeholder only) until typed into; leaving it empty and clicking Next shows the invalid-name dialog instead of advancing.
+- Faction cards show the right accent (crimson+gold for the Wardens, blue+silver for the Skyborn) only on the selected one.
+- The character-preview box appears on the Appearance step, clearly inert.
+- Switching language updates every string on all three steps, including stat names/descriptions and both factions' taglines.
+- Completing character creation end to end produces a character with the correct faction/appearance/stats server-side.
+
+Definition of done: build and tests are green, the migration is complete; the manual checklist above is left for me to run, not Claude Code.

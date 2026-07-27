@@ -114,8 +114,7 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
 
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel headerLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_ACHIEVEMENTS"));
-        headerLabel.setFontScale(2f);
+        VisLabel headerLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_ACHIEVEMENTS"), "title");
         headerLabel.setColor(UiPalette.ACCENT_CRIMSON);
         headerLabel.setAlignment(Align.center);
         mainPanel.add(headerLabel).padBottom(4).center().row();

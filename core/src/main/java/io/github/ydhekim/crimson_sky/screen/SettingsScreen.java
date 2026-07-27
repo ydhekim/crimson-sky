@@ -50,8 +50,7 @@ public class SettingsScreen extends BaseScreen {
 
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_SETTINGS"));
-        titleLabel.setFontScale(2f);
+        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_SETTINGS"), "title");
         titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         mainPanel.add(titleLabel).padBottom(20).colspan(2).row();
 

@@ -57,8 +57,7 @@ public class CharactersScreen extends BaseScreen implements NetworkListener {
 
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_CHARACTER_SELECTION"));
-        titleLabel.setFontScale(2f);
+        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_LBL_CHARACTER_SELECTION"), "title");
         titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         titleLabel.setAlignment(Align.center);
         mainPanel.add(titleLabel).padBottom(4).center().row();
