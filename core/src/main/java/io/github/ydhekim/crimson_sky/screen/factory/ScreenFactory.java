@@ -1,6 +1,5 @@
 package io.github.ydhekim.crimson_sky.screen.factory;
 
-import com.badlogic.gdx.Screen;
 import io.github.ydhekim.crimson_sky.CrimsonSky;
 import io.github.ydhekim.crimson_sky.screen.*;
 
@@ -17,13 +16,15 @@ public class ScreenFactory {
     }
 
     /**
-     * Creates a screen of the specified type.
+     * Creates a screen of the specified type. Returns {@link BaseScreen}, not {@code Screen} — every
+     * branch below already builds one, and the router needs {@link BaseScreen#refreshUI()} to re-localize
+     * a cached instance on re-entry.
      *
      * @param type the screen type to create
      * @return     the created screen instance
      * @throws     IllegalArgumentException if screen type is unknown
      */
-    public Screen createScreen(ScreenType type) {
+    public BaseScreen createScreen(ScreenType type) {
         return switch (type) {
             case MAIN_MENU -> new MainMenuScreen(game);
             case CHARACTERS -> new CharactersScreen(game);

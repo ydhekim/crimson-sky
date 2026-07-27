@@ -4,7 +4,6 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.actions.Actions;
-import com.badlogic.gdx.scenes.scene2d.ui.Container;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Stack;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -19,6 +18,7 @@ import io.github.ydhekim.crimson_sky.common.network.packet.LoginRequest;
 import io.github.ydhekim.crimson_sky.common.network.packet.LoginResponse;
 import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.network.NetworkListener;
+import io.github.ydhekim.crimson_sky.ui.CrestFactory;
 import io.github.ydhekim.crimson_sky.ui.DisplaySettings;
 import io.github.ydhekim.crimson_sky.ui.TextureFactory;
 import io.github.ydhekim.crimson_sky.ui.UIButtonBuilder;
@@ -152,8 +152,11 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
 
         root.add(createCrest()).size(CREST_OUTER_SIZE, CREST_OUTER_SIZE).padBottom(24).row();
 
-        VisLabel titleLabel = new VisLabel("CRIMSON SKY");
-        titleLabel.setFontScale(2.4f);
+        VisLabel titleLabel = new VisLabel("CRIMSON SKY", "title");
+        // The one title that isn't an exact match for the 32px bake: the splash was displaying at
+        // 16 × 2.4 = 38.4px, preserved here as 32 × 1.2. A far milder upscale than before, and not worth
+        // a third baked font size for one screen.
+        titleLabel.setFontScale(1.2f);
         titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         root.add(titleLabel).padBottom(18).row();
 
@@ -189,22 +192,11 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
     /**
      * Generic placeholder crest: a gold square with a slightly smaller crimson square in front, both
      * rotated 45°, faking a bordered diamond without needing a bordered-drawable capability. The
-     * inner square is wrapped in a {@link Container} because {@link Stack} otherwise stretches every
-     * child to the full cell — the container is what keeps the gold "border" visible.
+     * shape itself lives in {@link CrestFactory} so the character-creation faction cards can build
+     * the same crest in their own faction's colors.
      */
     private Stack createCrest() {
-        Image crestGold = new Image(new TextureRegionDrawable(new TextureRegion(crestGoldTexture)));
-        crestGold.setOrigin(CREST_OUTER_SIZE / 2f, CREST_OUTER_SIZE / 2f);
-        crestGold.setRotation(45);
-
-        Image crestCrimson = new Image(new TextureRegionDrawable(new TextureRegion(crestCrimsonTexture)));
-        crestCrimson.setOrigin(CREST_INNER_SIZE / 2f, CREST_INNER_SIZE / 2f);
-        crestCrimson.setRotation(45);
-
-        Stack crest = new Stack();
-        crest.add(crestGold);
-        crest.add(new Container<>(crestCrimson).size(CREST_INNER_SIZE));
-        return crest;
+        return CrestFactory.build(crestGoldTexture, crestCrimsonTexture, CREST_OUTER_SIZE, CREST_INNER_SIZE);
     }
 
     /**
@@ -260,8 +252,12 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
     public void onLocalizationResponse(io.github.ydhekim.crimson_sky.common.network.packet.LocalizationResponse response) {
         super.onLocalizationResponse(response);
 
-        // After localization is received, authenticate if we have a test token
-        if (response.success() && testIdentityToken != null && currentState != ConnectionState.AUTHENTICATING) {
+        // Only the very first LocalizationResponse — the one received while still CONNECTING, before any
+        // login attempt — should kick off authentication. This screen now receives a second one: the
+        // corrective re-fetch sent from onLoginResponse once the account's real language is known. By
+        // then currentState is SUCCESS, so this guard excludes it; the old `!= AUTHENTICATING` check
+        // would have matched it and fired a duplicate LoginRequest.
+        if (response.success() && testIdentityToken != null && currentState == ConnectionState.CONNECTING) {
             Gdx.app.postRunnable(this::authenticateWithPlatform);
         }
     }
@@ -277,6 +273,13 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
             game.setAccountSettings(settings);
             DisplaySettings.apply(settings.resolution(), settings.fullscreen());
             game.getLanguageManager().setCurrentLang(settings.language());
+            // The first LocalizationRequest (onConnected) necessarily guessed: it ran pre-login off the
+            // local GDX preference, which is a different source of truth from the account's saved
+            // language and can disagree with it on a fresh install or after playing elsewhere. Now that
+            // the real language is known, re-fetch — setCurrentLang only persists the value for next
+            // launch, so without this the pre-login translations map stays in effect for the whole
+            // session and every post-login screen renders in the wrong language (prompt 40).
+            game.getNetworkClient().sendTCP(new LocalizationRequest(settings.language()));
 
             setState(ConnectionState.SUCCESS);
             // Transition to main menu after a short delay (for UX)

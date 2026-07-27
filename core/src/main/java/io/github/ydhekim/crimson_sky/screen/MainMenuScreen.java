@@ -37,8 +37,7 @@ public class MainMenuScreen extends BaseScreen {
 
         VisTable mainPanel = createMainContentPanel();
 
-        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_TITLE_MAIN_MENU"));
-        titleLabel.setFontScale(2f);
+        VisLabel titleLabel = new VisLabel(game.getLanguageManager().get("UI_TITLE_MAIN_MENU"), "title");
         titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         mainPanel.add(titleLabel).padBottom(20).row();
 
