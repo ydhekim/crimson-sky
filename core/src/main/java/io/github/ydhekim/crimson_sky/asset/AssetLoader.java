@@ -19,6 +19,15 @@ public class AssetLoader {
         + "ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZ"
         + "0123456789.,:!?()_+-=/*%&'@\"";
 
+    private static final String FONT_FILE = "fonts/Quicksand-Regular.ttf";
+
+    /**
+     * Every text role bakes at this one size and is scaled to its display size once in
+     * {@code CrimsonSky.initializeUI()} — see the class-level note in {@code preloadAssets()} for why
+     * a single bake size rather than one bake per role.
+     */
+    private static final int BAKE_SIZE = 32;
+
     public AssetLoader() {
         this.assetManager = new AssetManager();
     }
@@ -46,41 +55,52 @@ public class AssetLoader {
      * This is a synchronous load; consider creating a loading screen for larger projects.
      */
     private void preloadAssets() {
-        // Configure font parameters
-        // Baked at 2× the 16px display size and scaled back down in CrimsonSky.initializeUI() — a
-        // supersample, since 16px is few source pixels for the rasterizer to anti-alias with. Mipmapping
-        // is on because this font is now deliberately minified, which is exactly what mipmaps are for;
-        // magFilter stays Linear since nothing magnifies it.
-        FreetypeFontLoader.FreeTypeFontLoaderParameter fontParameter = new FreetypeFontLoader.FreeTypeFontLoaderParameter();
-        fontParameter.fontFileName = "fonts/Quicksand-Regular.ttf";
-        fontParameter.fontParameters.size = 32;
-        fontParameter.fontParameters.genMipMaps = true;
-        fontParameter.fontParameters.minFilter = Texture.TextureFilter.MipMapLinearLinear;
-        fontParameter.fontParameters.magFilter = Texture.TextureFilter.Linear;
-        fontParameter.fontParameters.characters = FreeTypeFontGenerator.DEFAULT_CHARS + TURKISH_CHARS;
-
         // No image/atlas assets are shipped yet (M4 foundation cleanup) — placeholder visuals are
-        // code-generated via TextureFactory. Only the Turkish-capable FreeType font loads here.
-        assetManager.load("default-font.ttf", BitmapFont.class, fontParameter);
-
-        // A second bake of the same font at title size. FreeType produces raster glyph textures, not
-        // outlines, so a 16px bake stretched to 2× by setFontScale is visibly soft no matter what the
-        // texture filters say — every screen title did exactly that. Baking 32px (= 16 × 2, the size
-        // those titles were already displaying at) lets them render at fontScale(1f), unscaled and crisp.
-        // The load key is only the AssetManager's registry name, not a file: FreetypeFontLoader generates
-        // from fontFileName, which is how "default-font.ttf" already works with no such file on disk.
-        FreetypeFontLoader.FreeTypeFontLoaderParameter titleFontParameter = new FreetypeFontLoader.FreeTypeFontLoaderParameter();
-        titleFontParameter.fontFileName = "fonts/Quicksand-Regular.ttf";
-        titleFontParameter.fontParameters.size = 32;
-        titleFontParameter.fontParameters.minFilter = Texture.TextureFilter.Linear;
-        titleFontParameter.fontParameters.magFilter = Texture.TextureFilter.Linear;
-        titleFontParameter.fontParameters.characters = FreeTypeFontGenerator.DEFAULT_CHARS + TURKISH_CHARS;
-        assetManager.load("title-font.ttf", BitmapFont.class, titleFontParameter);
+        // code-generated via TextureFactory. Only the Turkish-capable FreeType font loads here, but it
+        // loads five times: one bake per distinct text role.
+        //
+        // Why five separate BitmapFont objects rather than one font rescaled per label: Scene2D's
+        // Label.setFontScale() writes straight through to the font's BitmapFontData, which every Label
+        // sharing that style shares too (libgdx#4232/#4346) — so two labels asking one font for two sizes
+        // means whichever lays out last wins, for both. Giving each role its own object, pre-scaled once
+        // at startup, removes the shared mutable state instead of trying to sequence around it.
+        //
+        // All five bake at the same BAKE_SIZE=32 canvas. For roles that display *below* 32px that's a
+        // supersample (FreeType gets 2× the source pixels per glyph, and the result is minified rather
+        // than hinted at a tiny native size), which is why those enable mipmapping — they're deliberately
+        // minified, exactly what mipmaps are for. Roles that display at or above 32px are magnified
+        // instead, so mipmaps would do nothing for them and Linear alone is correct.
+        //
+        // The load keys are AssetManager registry names, not files: FreetypeFontLoader generates from
+        // fontFileName, which is how "default-font.ttf" already works with no such file on disk.
+        loadFont("default-font.ttf", true);    // body — displays 16px
+        loadFont("caption-font.ttf", true);    // caption — displays 14px (timestamps, XP tags, version)
+        loadFont("emphasis-font.ttf", true);   // emphasis — displays 18px (character names)
+        loadFont("title-font.ttf", false);     // title — displays at the 32px bake, unscaled
+        loadFont("title-lg-font.ttf", false);  // title-lg — displays 38.4px (ConnectionScreen splash)
 
         // Block until all assets are loaded
         assetManager.finishLoading();
 
         System.out.println("All assets loaded successfully.");
+    }
+
+    /**
+     * Queues one bake of the shared Turkish-capable font under {@code assetKey}. {@code minified} selects
+     * the filter pair: mipmapped minification for roles that display below {@link #BAKE_SIZE}, plain
+     * Linear for roles that display at or above it.
+     */
+    private void loadFont(String assetKey, boolean minified) {
+        FreetypeFontLoader.FreeTypeFontLoaderParameter parameter = new FreetypeFontLoader.FreeTypeFontLoaderParameter();
+        parameter.fontFileName = FONT_FILE;
+        parameter.fontParameters.size = BAKE_SIZE;
+        parameter.fontParameters.genMipMaps = minified;
+        parameter.fontParameters.minFilter = minified
+            ? Texture.TextureFilter.MipMapLinearLinear
+            : Texture.TextureFilter.Linear;
+        parameter.fontParameters.magFilter = Texture.TextureFilter.Linear;
+        parameter.fontParameters.characters = FreeTypeFontGenerator.DEFAULT_CHARS + TURKISH_CHARS;
+        assetManager.load(assetKey, BitmapFont.class, parameter);
     }
 
     /**

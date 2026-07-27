@@ -279,8 +279,9 @@ public class CharacterCreationScreen extends BaseScreen {
         card.add(crest).size(CREST_OUTER_SIZE, CREST_OUTER_SIZE).padRight(12).top();
 
         VisTable textColumn = new VisTable();
-        VisLabel nameLabel = new VisLabel(game.getLanguageManager().get(nameKey));
-        nameLabel.setFontScale(1.1f);
+        // Shares "emphasis" with CharacterRowBuilder's name label; this one previously rendered a hair
+        // smaller (1.1× vs 1.2×), a difference that came from two uncoordinated passes rather than intent.
+        VisLabel nameLabel = new VisLabel(game.getLanguageManager().get(nameKey), "emphasis");
         // The faction's secondary accent (gold / silver) is what marks the selected card's name; there is
         // no real bordered-drawable support here (same limitation ConnectionScreen's crest documents), so
         // the background tint below plus this label color are what read as "selected" at a glance.

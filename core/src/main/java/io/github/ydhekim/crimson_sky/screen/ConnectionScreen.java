@@ -152,11 +152,9 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
 
         root.add(createCrest()).size(CREST_OUTER_SIZE, CREST_OUTER_SIZE).padBottom(24).row();
 
-        VisLabel titleLabel = new VisLabel("CRIMSON SKY", "title");
-        // The one title that isn't an exact match for the 32px bake: the splash was displaying at
-        // 16 × 2.4 = 38.4px, preserved here as 32 × 1.2. A far milder upscale than before, and not worth
-        // a third baked font size for one screen.
-        titleLabel.setFontScale(1.2f);
+        // The one title that isn't an exact match for the 32px bake: the splash displays at 38.4px, which
+        // is now "title-lg"'s own pre-scaled font rather than a setFontScale call on the shared one.
+        VisLabel titleLabel = new VisLabel("CRIMSON SKY", "title-lg");
         titleLabel.setColor(UiPalette.ACCENT_CRIMSON);
         root.add(titleLabel).padBottom(18).row();
 
@@ -180,9 +178,8 @@ public class ConnectionScreen extends BaseScreen implements NetworkListener {
         retryButton.setVisible(false);
         root.add(retryButton).size(UiMetrics.NAV_BUTTON_WIDTH, UiMetrics.NAV_BUTTON_HEIGHT);
 
-        VisLabel versionLabel = new VisLabel(VERSION_LABEL);
+        VisLabel versionLabel = new VisLabel(VERSION_LABEL, "caption");
         versionLabel.setColor(UiPalette.TEXT_VERSION);
-        versionLabel.setFontScale(0.85f);
         versionLabel.setPosition(20, 20);
         stage.addActor(versionLabel);
 

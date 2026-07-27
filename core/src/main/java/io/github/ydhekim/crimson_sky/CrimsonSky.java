@@ -4,7 +4,13 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
+import com.badlogic.gdx.scenes.scene2d.ui.List;
+import com.badlogic.gdx.scenes.scene2d.ui.SelectBox;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Window;
 import com.kotcrab.vis.ui.VisUI;
+import com.kotcrab.vis.ui.widget.VisCheckBox;
+import com.kotcrab.vis.ui.widget.VisTextField;
 import io.github.ydhekim.crimson_sky.asset.AssetLoader;
 import io.github.ydhekim.crimson_sky.common.model.AccountSettings;
 import io.github.ydhekim.crimson_sky.config.ConfigurationManager;
@@ -21,6 +27,14 @@ import io.github.ydhekim.crimson_sky.util.LanguageManager;
  * Applies Dependency Inversion and Single Responsibility Principle.
  */
 public class CrimsonSky extends Game {
+    // Display size of each text role, as a scale factor on AssetLoader's shared 32px bake. Body is the
+    // 16px baseline; caption/emphasis replace the 0.85×/1.1×/1.2× setFontScale calls that used to sit at
+    // the call sites, resolved against 16px rather than VisUI's old 15px bundled font.
+    private static final float BODY_SCALE = 0.5f;       // 16px
+    private static final float CAPTION_SCALE = 0.4375f; // 14px
+    private static final float EMPHASIS_SCALE = 0.5625f;// 18px
+    private static final float TITLE_LG_SCALE = 1.2f;   // 38.4px
+
     private GameClient networkClient;
     private AssetManager assetManager;
     private LanguageManager languageManager;
@@ -68,42 +82,68 @@ public class CrimsonSky extends Game {
      */
     private void initializeUI() {
         if (!VisUI.isLoaded()) {
+            // One BitmapFont object per text role, each scaled from the shared 32px bake exactly once,
+            // here. Nothing in the app may call Label.setFontScale() afterwards: that call writes through
+            // to the font's BitmapFontData, which is shared by every label drawing with the same font
+            // object, so one label's scale silently becomes every sibling label's scale
+            // (libgdx#4232/#4346). Separate objects are what make the sizes below independent.
             BitmapFont bodyFont = assetManager.get("default-font.ttf", BitmapFont.class);
-            // Supersampling: the body font is baked at 32px and scaled back to its 16px display size, so
-            // FreeType's rasterizer gets 2× the source pixels per glyph and the result is Linear-minified
-            // rather than hinted at a tiny native size. Visual size is unchanged — 32 × 0.5 = the old 16.
-            // NOTE: Scene2D's Label.setFontScale REPLACES this base scale rather than multiplying it (see
-            // Label.layout()), so any label drawing with THIS font that also sets its own scale must fold
-            // the 0.5 in. None do today — the existing setFontScale sites are all plain VisLabels, which
-            // use VisUI's bundled font, not this one (see the font-reach note below).
-            bodyFont.getData().setScale(0.5f);
+            bodyFont.getData().setScale(BODY_SCALE);
+            BitmapFont captionFont = assetManager.get("caption-font.ttf", BitmapFont.class);
+            captionFont.getData().setScale(CAPTION_SCALE);
+            BitmapFont emphasisFont = assetManager.get("emphasis-font.ttf", BitmapFont.class);
+            emphasisFont.getData().setScale(EMPHASIS_SCALE);
             // The title font is already baked at its intended 32px display size (prompt 41), so it needs
-            // no compensating rescale.
+            // no compensating rescale; title-lg is the one role that magnifies past the bake.
             BitmapFont titleFont = assetManager.get("title-font.ttf", BitmapFont.class);
+            BitmapFont titleLgFont = assetManager.get("title-lg-font.ttf", BitmapFont.class);
+            titleLgFont.getData().setScale(TITLE_LG_SCALE);
 
             // No custom skin/atlases are shipped (M4 foundation cleanup): load VisUI's own bundled
-            // default skin and register only the custom Turkish-capable fonts onto it.
-            //
-            // How far these fonts actually reach (verified at runtime, not assumed): Skin resolves a
-            // style's font reference when it parses the skin JSON, so the styles VisUI.load() has already
-            // built keep pointing at VisUI's own bundled "Vis Open Sans" 15px — adding "default-font"
-            // here replaces the map entry, not those existing bindings. Only code that looks the font up
-            // *after* this point gets ours: BaseScreen's button styles (getFont("default-font")) and the
-            // "title" style below. Plain VisLabels therefore still render in VisUI's font, which is why
-            // this class currently draws two typefaces side by side.
+            // default skin, then repoint it at the Turkish-capable font.
             VisUI.load();
-            VisUI.getSkin().add("default-font", bodyFont, BitmapFont.class);
-            VisUI.getSkin().add("title-font", titleFont, BitmapFont.class);
+            Skin skin = VisUI.getSkin();
+            skin.add("default-font", bodyFont, BitmapFont.class);
+            skin.add("title-font", titleFont, BitmapFont.class);
 
-            // A named style rather than reassigning the shared default LabelStyle's font: that style
-            // object backs every plain label in the app, so mutating it in place would reflow all of
-            // them (the same shared-mutable-style hazard flagged for VisProgressBar in prompt 39).
-            Label.LabelStyle titleStyle = new Label.LabelStyle(VisUI.getSkin().get(Label.LabelStyle.class));
-            titleStyle.font = titleFont;
-            VisUI.getSkin().add("title", titleStyle, Label.LabelStyle.class);
+            // Why each style needs its font field assigned individually (K10's finding, verified at
+            // runtime): Skin resolves a style's font when it *parses* the skin JSON, so every style
+            // VisUI.load() just built holds a direct reference to VisUI's own bundled "Vis Open Sans"
+            // 15px. Registering "default-font" above only replaces a map entry — it can't reach back into
+            // a style object that already captured the old reference. BaseScreen's button styles were
+            // never affected because UiTheme constructs fresh TextButtonStyles at screen-construction
+            // time, well after this runs, which sidesteps the parse-time freeze entirely.
+            skin.get(Label.LabelStyle.class).font = bodyFont;
+            skin.get(VisTextField.VisTextFieldStyle.class).font = bodyFont;
+            skin.get(VisCheckBox.VisCheckBoxStyle.class).font = bodyFont;
+            // VisDialog's title bar: VisDialog(String) → VisWindow(title, true) → WindowStyle "default".
+            skin.get(Window.WindowStyle.class).titleFont = bodyFont;
 
-            System.out.println("VisUI initialized with bundled skin + custom fonts (body 32px@0.5, title 32px).");
+            // VisSelectBox extends Scene2D's SelectBox and uses the plain SelectBoxStyle — VisUI defines
+            // no VisSelectBoxStyle at all. Its dropdown needs a *second* assignment: the skin JSON gives
+            // SelectBoxStyle an inline `listStyle: {...}` object, so the open dropdown reads that nested
+            // instance, not the shared List$ListStyle the next line fixes. Repointing only one of the two
+            // leaves either the closed box or the open list in the wrong typeface.
+            SelectBox.SelectBoxStyle selectBoxStyle = skin.get(SelectBox.SelectBoxStyle.class);
+            selectBoxStyle.font = bodyFont;
+            selectBoxStyle.listStyle.font = bodyFont;
+            skin.get(List.ListStyle.class).font = bodyFont;
+
+            // Named styles for every non-default text role, each backed by its own pre-scaled font.
+            skin.add("title", labelStyleWith(skin, titleFont), Label.LabelStyle.class);
+            skin.add("title-lg", labelStyleWith(skin, titleLgFont), Label.LabelStyle.class);
+            skin.add("caption", labelStyleWith(skin, captionFont), Label.LabelStyle.class);
+            skin.add("emphasis", labelStyleWith(skin, emphasisFont), Label.LabelStyle.class);
+
+            System.out.println("VisUI initialized: every default style now uses the Turkish-capable font.");
         }
+    }
+
+    /** A copy of the skin's default label style with {@code font} swapped in — one line per named role. */
+    private static Label.LabelStyle labelStyleWith(Skin skin, BitmapFont font) {
+        Label.LabelStyle style = new Label.LabelStyle(skin.get(Label.LabelStyle.class));
+        style.font = font;
+        return style;
     }
 
     public GameClient getNetworkClient() {
