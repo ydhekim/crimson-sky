@@ -213,15 +213,13 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         rowTable.add(textTable).expandX().fillX().align(Align.top);
 
         if (ach.isUnlocked()) {
-            VisLabel timeLabel = new VisLabel(formatRelativeTime(ach.unlockedAt()));
+            VisLabel timeLabel = new VisLabel(formatRelativeTime(ach.unlockedAt()), "caption");
             timeLabel.setColor(UiPalette.TEXT_MUTED);
-            timeLabel.setFontScale(0.85f);
             rowTable.add(timeLabel).padRight(10).align(Align.right);
         }
 
-        VisLabel xpLabel = new VisLabel("+" + ach.xpReward() + " XP");
+        VisLabel xpLabel = new VisLabel("+" + ach.xpReward() + " XP", "caption");
         xpLabel.setColor(ach.isUnlocked() ? UiPalette.ACCENT_GOLD : UiPalette.TEXT_MUTED);
-        xpLabel.setFontScale(0.85f);
         VisTable xpBadge = new VisTable();
         xpBadge.setBackground(ach.isUnlocked() ? xpBadgeUnlockedDrawable : xpBadgeLockedDrawable);
         xpBadge.pad(4, 10, 4, 10);

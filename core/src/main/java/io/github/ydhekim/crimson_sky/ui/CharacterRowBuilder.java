@@ -77,8 +77,7 @@ public class CharacterRowBuilder {
 
         Table infoTable = new Table();
         infoTable.left();
-        VisLabel nameLabel = new VisLabel(character.name());
-        nameLabel.setFontScale(1.2f);
+        VisLabel nameLabel = new VisLabel(character.name(), "emphasis");
         infoTable.add(nameLabel).left().padBottom(5).row();
 
         int level = character.level();
