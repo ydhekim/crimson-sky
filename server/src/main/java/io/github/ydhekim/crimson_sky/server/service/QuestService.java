@@ -6,6 +6,7 @@ import io.github.ydhekim.crimson_sky.common.model.Inventory;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
 import io.github.ydhekim.crimson_sky.common.model.QuestClaimResult;
 import io.github.ydhekim.crimson_sky.common.model.QuestProgress;
+import io.github.ydhekim.crimson_sky.common.model.QuestReward;
 import io.github.ydhekim.crimson_sky.server.database.dao.AccountDao;
 import io.github.ydhekim.crimson_sky.server.database.dao.BattleHistoryDao;
 import io.github.ydhekim.crimson_sky.server.database.dao.CharacterDao;
@@ -215,11 +216,33 @@ public class QuestService {
             int claimsToday = questClaimDao.countClaimsSince(characterId, quest.id, startOfToday);
             int remaining = Math.max(0, REPEATABLE_DAILY_CLAIM_CAP - claimsToday);
             return new QuestProgress(quest.id, quest.description, currentWins, quest.targetWins,
-                complete && remaining > 0, remaining == 0, remaining);
+                complete && remaining > 0, remaining == 0, remaining, rewardOptionsFor(quest));
         }
         boolean claimed = questClaimDao.isClaimed(characterId, quest.id, periodStart);
         return new QuestProgress(quest.id, quest.description, currentWins, quest.targetWins,
-            complete && !claimed, claimed, claimed ? 0 : 1);
+            complete && !claimed, claimed, claimed ? 0 : 1, rewardOptionsFor(quest));
+    }
+
+    /**
+     * What claiming {@code quest} pays, as wire-visible data. This mirrors — rather than drives — the reward
+     * logic {@link #claim} applies inline, so the two must be kept in step; {@code QuestServiceTest} asserts
+     * they agree for every quest precisely because the knowledge now lives in two places. Reuses
+     * {@code ShopService}'s package-private consumable keys directly, the same reason this service sits in
+     * {@code server.service} rather than {@code server.quest} (see the class javadoc).
+     */
+    private static Array<QuestReward> rewardOptionsFor(QuestDefinition quest) {
+        Array<QuestReward> rewards = new Array<>();
+        switch (quest) {
+            case DAILY_WIN_2 -> rewards.add(
+                new QuestReward("CONSUMABLE", ShopService.SKILL_RESTORATION_SCROLL, 1));
+            case WEEKLY_WIN_10 -> {
+                rewards.add(new QuestReward("CONSUMABLE", ShopService.REPAIR_TOKEN, 1));
+                rewards.add(new QuestReward("CONSUMABLE", ShopService.PET_CARE_KIT, 1));
+            }
+            case REPEATABLE_WIN_1 -> rewards.add(
+                new QuestReward("GOLD", null, REPEATABLE_GOLD_REWARD));
+        }
+        return rewards;
     }
 
     /** DAILY/REPEATABLE measure from UTC midnight today; WEEKLY from the most recent Monday (§19). */

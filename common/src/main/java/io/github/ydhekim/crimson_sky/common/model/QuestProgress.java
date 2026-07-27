@@ -1,5 +1,7 @@
 package io.github.ydhekim.crimson_sky.common.model;
 
+import com.badlogic.gdx.utils.Array;
+
 /**
  * One quest's live status for a character (system design §19, Epic P). Computed on demand — never stored —
  * from {@code battle_history} (the win count) and {@code quest_claims} (the claim state), so it can never
@@ -17,6 +19,9 @@ package io.github.ydhekim.crimson_sky.common.model;
  *       quest, or today's cap reached for the repeatable one.</li>
  *   <li>{@code claimsRemainingToday} — how many more times it can be claimed today: {@code 0} or {@code 1}
  *       for a daily/weekly quest (one per period), counting down from the cap for the repeatable one.</li>
+ *   <li>{@code rewardOptions} — what claiming pays. One entry for the daily and repeatable quests; two for
+ *       the weekly, which is a player's choice of one, not both (see {@link QuestReward}). Sent so a UI can
+ *       show a quest's reward without hardcoding what {@code QuestService.claim} grants.</li>
  * </ul>
  */
 public record QuestProgress(
@@ -26,6 +31,7 @@ public record QuestProgress(
     int targetWins,
     boolean claimable,
     boolean alreadyClaimed,
-    int claimsRemainingToday
+    int claimsRemainingToday,
+    Array<QuestReward> rewardOptions
 ) {
 }

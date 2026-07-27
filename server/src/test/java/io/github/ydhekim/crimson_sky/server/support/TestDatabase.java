@@ -269,6 +269,20 @@ public final class TestDatabase {
     }
 
     /**
+     * As above, but pinning {@code unlocked_at} instead of taking the {@code CURRENT_TIMESTAMP} default —
+     * the account-wide aggregate reports {@code MIN(unlocked_at)} across an account's characters (K14), and
+     * "the earliest one wins" is only assertable when two unlocks carry distinguishable, ordered instants.
+     */
+    public TestDatabase withAchievementUnlock(long accountId, long achievementId, Long characterId,
+                                              Instant unlockedAt) {
+        jdbi.useHandle(handle -> handle.execute(
+            "INSERT INTO achievement_unlocks (account_id, achievement_id, character_id, unlocked_at) "
+                + "VALUES (?, ?, ?, ?)",
+            accountId, achievementId, characterId, Timestamp.from(unlockedAt)));
+        return this;
+    }
+
+    /**
      * Seeds one fully-specified {@code battle_history} row (S3 match-history tests). Unlike
      * {@link #withBattleHistory}, this controls the opponent ({@code null} → a bot fight), battle mode, Elo
      * deltas and turn count — everything a {@code RecentMatch} projects. {@code rankedEloDelta} is {@code null}
