@@ -207,5 +207,11 @@ public class KryoConfig {
         // CreateCharacterRequest itself (which now carries an Appearance) was registered much earlier —
         // record field changes don't move a type's own registration, only a brand-new type needs a new call.
         kryo.register(Appearance.class, new RecordSerializer<>(Appearance.class));
+
+        // Quest rewards over the wire (prompt 46) — QuestProgress gained a rewardOptions Array so a UI can
+        // show what a quest pays. Appended after Appearance so every positional ID above is untouched
+        // (system design §5, append-only); QuestProgress itself keeps its much earlier registration, since
+        // adding a record field doesn't move a type's own ID — only the brand-new type needs a call here.
+        kryo.register(QuestReward.class, new RecordSerializer<>(QuestReward.class));
     }
 }

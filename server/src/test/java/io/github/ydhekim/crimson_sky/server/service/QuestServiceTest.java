@@ -5,6 +5,7 @@ import io.github.ydhekim.crimson_sky.common.model.Character;
 import io.github.ydhekim.crimson_sky.common.model.MessageCode;
 import io.github.ydhekim.crimson_sky.common.model.QuestClaimResult;
 import io.github.ydhekim.crimson_sky.common.model.QuestProgress;
+import io.github.ydhekim.crimson_sky.common.model.QuestReward;
 import io.github.ydhekim.crimson_sky.server.quest.QuestPeriods;
 import io.github.ydhekim.crimson_sky.server.support.CombatFixtures;
 import io.github.ydhekim.crimson_sky.server.support.FakeCharacterDao;
@@ -19,6 +20,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -314,6 +316,92 @@ class QuestServiceTest {
         assertEquals(2, db.questClaimCountOf(CHARACTER, REPEATABLE), "two claim rows, same quest id");
         assertEquals(2, db.distinctQuestClaimPeriodCountOf(CHARACTER, REPEATABLE),
             "each repeatable claim took its own period_start, so the two never collide on the UNIQUE triple");
+    }
+
+    // --- rewardOptions: what a quest advertises is what claiming pays --------------------------------
+    //
+    // Reward knowledge now lives in two places: claim()'s inline logic, and statusOf()'s rewardOptionsFor()
+    // helper that puts it on the wire for the UI. These tests are the guard against the two drifting apart.
+
+    @Test
+    void everyQuestAdvertisesAtLeastOneReward() {
+        seed(STARTING_GOLD);
+        for (QuestProgress quest : status()) {
+            assertTrue(quest.rewardOptions() != null && quest.rewardOptions().size > 0,
+                quest.questId() + " reached the wire with no reward to show");
+        }
+    }
+
+    @Test
+    void theDailyAdvertisesExactlyTheScrollItGrants() {
+        seed(STARTING_GOLD);
+        seedWins(2);
+
+        Array<QuestReward> options = progressFor(status(), DAILY).rewardOptions();
+        assertEquals(1, options.size, "the daily is one fixed reward, not a choice");
+        QuestReward advertised = options.get(0);
+        assertEquals("CONSUMABLE", advertised.type());
+        assertEquals(ShopService.SKILL_RESTORATION_SCROLL, advertised.itemKey());
+
+        QuestClaimResult granted = service.claim(ACCOUNT, CHARACTER, DAILY, null).data();
+        assertEquals(advertised.amount(), grantedCountOf(granted, advertised.itemKey()),
+            "the daily granted a different amount than it advertised");
+        assertEquals(STARTING_GOLD, granted.remainingGold(), "a CONSUMABLE reward pays no gold");
+    }
+
+    @Test
+    void theWeeklyAdvertisesTheTwoTokensItLetsThePlayerChooseBetween() {
+        seed(STARTING_GOLD);
+        seedWins(10);
+
+        Array<QuestReward> options = progressFor(status(), WEEKLY).rewardOptions();
+        assertEquals(2, options.size, "the weekly is a choice of two");
+        assertEquals(ShopService.REPAIR_TOKEN, options.get(0).itemKey());
+        assertEquals(ShopService.PET_CARE_KIT, options.get(1).itemKey());
+
+        // Each advertised option must be an accepted rewardChoice paying exactly what it says — claimed from
+        // a fresh period each time, since one weekly claim spends the period's only allowance.
+        for (QuestReward advertised : options) {
+            seed(STARTING_GOLD);
+            seedWins(10);
+
+            var result = service.claim(ACCOUNT, CHARACTER, WEEKLY, advertised.itemKey());
+            assertTrue(result.success(), advertised.itemKey() + " was advertised but rejected as a choice");
+            assertEquals("CONSUMABLE", advertised.type());
+            assertEquals(advertised.amount(), grantedCountOf(result.data(), advertised.itemKey()),
+                "the weekly granted a different amount of " + advertised.itemKey() + " than it advertised");
+            assertEquals(STARTING_GOLD, result.data().remainingGold(), "a CONSUMABLE reward pays no gold");
+        }
+    }
+
+    @Test
+    void theRepeatableAdvertisesExactlyTheGoldItPays() {
+        seed(STARTING_GOLD);
+        seedWins(1);
+
+        Array<QuestReward> options = progressFor(status(), REPEATABLE).rewardOptions();
+        assertEquals(1, options.size, "the repeatable is one fixed reward, not a choice");
+        QuestReward advertised = options.get(0);
+        assertEquals("GOLD", advertised.type());
+        assertNull(advertised.itemKey(), "a GOLD reward names no item");
+
+        service.claim(ACCOUNT, CHARACTER, REPEATABLE, null);
+        assertEquals(STARTING_GOLD + advertised.amount(), db.goldOf(ACCOUNT),
+            "the repeatable paid a different amount of gold than it advertised");
+    }
+
+    /** How many of {@code itemKey} a claim actually granted, read off the claim's own reported counts. */
+    private static int grantedCountOf(QuestClaimResult result, String itemKey) {
+        if (ShopService.SKILL_RESTORATION_SCROLL.equals(itemKey)) {
+            return result.scrollCount();
+        }
+        if (ShopService.REPAIR_TOKEN.equals(itemKey)) {
+            return result.repairTokenCount();
+        }
+        if (ShopService.PET_CARE_KIT.equals(itemKey)) {
+            return result.petCareKitCount();
+        }
+        throw new AssertionError("a quest advertised an item no claim result reports: " + itemKey);
     }
 
     @Test

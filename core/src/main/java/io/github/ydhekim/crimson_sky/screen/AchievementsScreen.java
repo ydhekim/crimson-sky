@@ -122,7 +122,16 @@ public class AchievementsScreen extends BaseScreen implements NetworkListener {
         unlockedCountLabel = new VisLabel("");
         unlockedCountLabel.setColor(UiPalette.TEXT_MUTED);
         unlockedCountLabel.setAlignment(Align.center);
-        mainPanel.add(unlockedCountLabel).padBottom(20).center().row();
+        mainPanel.add(unlockedCountLabel).padBottom(2).center().row();
+
+        // This list aggregates across every character on the account (K14), which is a different question
+        // from a single character's own achievement list. Saying so keeps the legitimate difference between
+        // the two views from reading as an inconsistency once a player has seen both.
+        VisLabel accountScopeLabel =
+            new VisLabel(game.getLanguageManager().get("UI_LBL_ACHIEVEMENTS_ACCOUNT_SCOPE"), "caption");
+        accountScopeLabel.setColor(UiPalette.TEXT_MUTED);
+        accountScopeLabel.setAlignment(Align.center);
+        mainPanel.add(accountScopeLabel).padBottom(20).center().row();
 
         scrollTable = new VisTable();
         scrollTable.top();

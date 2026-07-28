@@ -13,11 +13,29 @@ import java.util.List;
 public interface AchievementDao {
 
     /**
-     * The existing read endpoint's query (S3's predecessor). Updated for V15 only where the schema forced
-     * it: the join now targets the renamed {@code achievement_unlocks} table, and the dropped
-     * {@code progress_data} column is gone from both this SELECT and {@code AccountAchievement}. The
-     * {@code character_id IS NULL} filter keeps this account-level view reading only account-scope unlocks —
-     * per-character unlocks surface through S3's character page, not here.
+     * Every achievement's unlock status <i>account-wide</i> — MainMenu's {@code AchievementsScreen}. This is
+     * deliberately a different question from {@link #getAchievementsForCharacterPage}: "has <b>any</b>
+     * character on this account ever earned this?", not "did <b>this</b> character earn it?".
+     *
+     * <p><b>K13/K14 fix.</b> This query previously joined with a flat {@code au.character_id IS NULL}, which
+     * matches only ACCOUNT-scope unlock rows — but 8 of the 10 seeded achievements are CHARACTER-scope, and
+     * no code path ever writes a CHARACTER-scope unlock with a NULL {@code character_id}. Those eight were
+     * therefore listed but permanently locked here regardless of real progress. The scope is now branched
+     * the same way {@code AchievementUnlockService} branches it on the write side, with CHARACTER-scope
+     * unlocks matched against every character the account owns.
+     *
+     * <p>The scope-branched {@code LEFT JOIN} would fan a CHARACTER-scope achievement out once per qualifying
+     * character, which would both render duplicate rows and inflate the screen's unlocked-count math, so it
+     * is collapsed back to exactly one row per definition by {@code GROUP BY} on the definition's own
+     * columns. {@code MIN(au.unlocked_at)} answers "when did this account first earn it" — the only sensible
+     * timestamp when several characters qualify — and is {@code NULL} for a definition no unlock matched,
+     * which is what {@code isUnlocked} reads.
+     *
+     * <p><b>Why the aggregate rather than {@code LEFT JOIN LATERAL}:</b> the two express the identical
+     * result, but H2 (the test database) cannot parse {@code LATERAL} in a join clause — it reads it as an
+     * unknown function — so the lateral form would have left this query with no regression test at all. This
+     * is the same portable-SQL constraint that already shaped {@code insertAccountUnlockIgnoringConflict}'s
+     * bare {@code ON CONFLICT}; plain {@code GROUP BY} is standard SQL and runs identically on both.
      */
     @SqlQuery("SELECT " +
         "  ad.key_name AS keyName, " +
@@ -25,13 +43,15 @@ public interface AchievementDao {
         "  lk_d.key_name AS descLocKey, " +
         "  ad.xp_reward AS xpReward, " +
         "  ad.icon_id AS iconId, " +
-        "  (au.id IS NOT NULL) AS isUnlocked, " +
-        "  au.unlocked_at AS unlockedAt " +
+        "  (MIN(au.unlocked_at) IS NOT NULL) AS isUnlocked, " +
+        "  MIN(au.unlocked_at) AS unlockedAt " +
         "FROM achievement_definitions ad " +
         "JOIN localization_keys lk_t ON ad.title_loc_key = lk_t.id " +
         "JOIN localization_keys lk_d ON ad.desc_loc_key = lk_d.id " +
-        "LEFT JOIN achievement_unlocks au ON ad.id = au.achievement_id AND au.account_id = :accountId " +
-        "  AND au.character_id IS NULL " +
+        "LEFT JOIN achievement_unlocks au ON au.achievement_id = ad.id " +
+        "  AND ((ad.scope = 'ACCOUNT' AND au.account_id = :accountId AND au.character_id IS NULL) " +
+        "    OR (ad.scope = 'CHARACTER' AND au.character_id IN (SELECT id FROM characters WHERE account_id = :accountId))) " +
+        "GROUP BY ad.id, ad.key_name, lk_t.key_name, lk_d.key_name, ad.xp_reward, ad.icon_id " +
         "ORDER BY ad.id")
     @RegisterConstructorMapper(AccountAchievement.class)
     List<AccountAchievement> getAchievementsForAccount(@Bind("accountId") long accountId);
